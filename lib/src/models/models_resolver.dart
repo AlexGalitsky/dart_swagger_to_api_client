@@ -11,22 +11,31 @@ abstract class ModelsResolver {
   ///
   /// Returns `null` if the reference cannot be resolved or if the
   /// corresponding model doesn't exist.
-  String? resolveRefToType(String ref);
+  ///
+  /// Note: This method may be async if the resolver needs to scan files.
+  /// For synchronous resolvers, it should return a completed Future.
+  Future<String?> resolveRefToType(String ref);
 
   /// Gets the import path for a model type.
   ///
-  /// Example: `User` → `package:my_app/models/user.dart`
+  /// Example: `User` → `package:my_app/models/user.dart` or `../models/user.dart`
   ///
   /// Returns `null` if the type is not found or doesn't need an import
   /// (e.g., built-in types).
-  String? getImportPath(String typeName);
+  ///
+  /// Note: This method may be async if the resolver needs to scan files.
+  /// For synchronous resolvers, it should return a completed Future.
+  Future<String?> getImportPath(String typeName);
 
   /// Checks if a type name corresponds to a generated model.
   ///
   /// This is useful to distinguish between:
   /// - Generated models (e.g., `User`, `Order`)
   /// - Built-in types (e.g., `String`, `int`, `Map<String, dynamic>`)
-  bool isModelType(String typeName);
+  ///
+  /// Note: This method may be async if the resolver needs to scan files.
+  /// For synchronous resolvers, it should return a completed Future.
+  Future<bool> isModelType(String typeName);
 }
 
 /// Placeholder implementation that doesn't resolve anything.
@@ -38,11 +47,11 @@ class NoOpModelsResolver implements ModelsResolver {
   const NoOpModelsResolver();
 
   @override
-  String? resolveRefToType(String ref) => null;
+  Future<String?> resolveRefToType(String ref) async => null;
 
   @override
-  String? getImportPath(String typeName) => null;
+  Future<String?> getImportPath(String typeName) async => null;
 
   @override
-  bool isModelType(String typeName) => false;
+  Future<bool> isModelType(String typeName) async => false;
 }
