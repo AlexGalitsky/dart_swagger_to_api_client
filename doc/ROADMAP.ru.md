@@ -177,12 +177,14 @@ dart_swagger_to_api_client — Дорожная карта
 
 Дальнейшие версии можно развивать итеративно, в духе `dart_swagger_to_models`:
 
-- **0.5.0 Тестовый контур и стабильность** ⚠️ Частично
+- **0.5.0 Тестовый контур и стабильность** ✅
   - ✅ Unit‑тесты для генераторов (`endpoint_method_generator_test.dart`).
   - ✅ Интеграционные тесты для полного цикла генерации (`api_client_generator_test.dart`).
   - ✅ Тесты для конфигурации и валидации.
-  - ❌ Интеграционные тесты на фейковый OpenAPI или локальный тестовый сервер — **TODO**.
-  - ❌ Регрессионные тесты для разных версий OpenAPI/Swagger — **TODO**.
+  - ✅ Интеграционные тесты на httpbin.org (`integration_test.dart`) — опциональные, включаются через `--dart-define=ENABLE_INTEGRATION_TESTS=true`.
+  - ✅ Регрессионные тесты для разных версий OpenAPI/Swagger (`regression_test.dart`) — OpenAPI 3.0.0, 3.1.0, различные сценарии.
+  - ✅ Тесты для edge cases (`edge_cases_test.dart`) — пустые specs, невалидные параметры, неподдерживаемые методы.
+  - ✅ Master test file (`dart_swagger_to_api_client_test.dart`) для организации всех тестов.
 
 - **0.6.0 Advanced DX**
   - Watch‑режим (`--watch`) для авто‑регенерации клиента.
