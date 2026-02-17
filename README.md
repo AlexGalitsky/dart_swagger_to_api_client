@@ -61,8 +61,18 @@ dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
 ```dart
 import 'package:dart_swagger_to_api_client/dart_swagger_to_api_client.dart';
 
+// Использование стандартного HTTP адаптера (package:http)
 final config = ApiClientConfig(
   baseUrl: Uri.parse('https://api.example.com'),
+);
+
+// Или использование Dio адаптера
+import 'package:dio/dio.dart';
+final dio = Dio();
+final adapter = DioHttpClientAdapter(dio: dio);
+final config = ApiClientConfig(
+  baseUrl: Uri.parse('https://api.example.com'),
+  httpClientAdapter: adapter,
 );
 
 final client = ApiClient(config);
