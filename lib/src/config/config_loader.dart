@@ -93,6 +93,7 @@ class ConfigLoader {
         auth = AuthConfig(
           apiKeyHeader: readString(authNode, 'apiKeyHeader'),
           apiKeyQuery: readString(authNode, 'apiKeyQuery'),
+          apiKey: readString(authNode, 'apiKey'),
           // We intentionally ignore bearerTokenEnv at v0.1 and allow
           // only direct bearerToken value for simplicity.
           bearerToken: readString(authNode, 'bearerToken'),

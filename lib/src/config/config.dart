@@ -17,6 +17,12 @@ class AuthConfig {
   /// Query parameter name for API key, e.g. `api_key`.
   final String? apiKeyQuery;
 
+  /// Static API key value.
+  ///
+  /// In real applications you might want to inject this from secure storage
+  /// or environment variables instead of hard-coding it.
+  final String? apiKey;
+
   /// Static bearer token value.
   ///
   /// Future versions may support indirection via env/secure storage,
@@ -26,6 +32,7 @@ class AuthConfig {
   const AuthConfig({
     this.apiKeyHeader,
     this.apiKeyQuery,
+    this.apiKey,
     this.bearerToken,
   });
 }
