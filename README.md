@@ -137,6 +137,41 @@ final userJson = await client.defaultApi.getUser();
 На этом этапе все методы возвращают `Map<String, dynamic>` — привязка к
 конкретным моделям (`User`, `Order` и т.д.) появится на следующих итерациях.
 
+### Управление ресурсами и scoped клиенты
+
+#### Закрытие клиента
+
+Когда клиент больше не нужен, вызовите `close()` для освобождения ресурсов:
+
+```dart
+final client = ApiClient(config);
+try {
+  // Использование клиента
+  await client.defaultApi.getUsers();
+} finally {
+  await client.close(); // Освобождает ресурсы адаптера
+}
+```
+
+#### Scoped клиенты с дополнительными заголовками
+
+Метод `withHeaders()` создаёт новый клиент с объединёнными заголовками:
+
+```dart
+final baseClient = ApiClient(config);
+
+// Создать scoped клиент с дополнительными заголовками
+final scopedClient = baseClient.withHeaders({
+  'X-Request-ID': '123',
+  'X-User-ID': 'user-456',
+});
+
+// Все запросы через scopedClient будут включать эти заголовки
+final users = await scopedClient.defaultApi.getUsers();
+```
+
+Заголовки из `withHeaders()` переопределяют существующие заголовки с тем же ключом.
+
 ## v0.1 Smoke test (в этом репозитории)
 
 В репозитории есть минимальная OpenAPI‑спека для теста:
