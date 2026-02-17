@@ -13,77 +13,79 @@ dart_swagger_to_api_client — Дорожная карта
 
 Ниже — план версий v0.1–v0.5+.
 
-## v0.1 — Minimal Viable Client (MVP, только `http`)
+**Статус реализации**: ✅ v0.1 полностью завершён, частично реализованы v0.2 и v0.4.2.
+
+## v0.1 — Minimal Viable Client (MVP, только `http`) ✅ ЗАВЕРШЕНО
 
 **Цель**: получить рабочий, но минималистичный API‑клиент поверх уже сгенерированных моделей.
 
-### 0.1.1 Базовые типы и инфраструктура
+### 0.1.1 Базовые типы и инфраструктура ✅
 
 - `lib/src/config/`:
-  - `ApiClientConfig` — базовый URL, заголовки по умолчанию, таймаут, auth, HTTP‑адаптер.
-  - `AuthConfig` — API key / bearer token.
+  - ✅ `ApiClientConfig` — базовый URL, заголовки по умолчанию, таймаут, auth, HTTP‑адаптер.
+  - ✅ `AuthConfig` — API key / bearer token.
 - `lib/src/core/`:
-  - `HttpClientAdapter`, `HttpRequest`, `HttpResponse`.
-  - Конкретный адаптер `HttpHttpClientAdapter` на базе `package:http`.
+  - ✅ `HttpClientAdapter`, `HttpRequest`, `HttpResponse`.
+  - ✅ Конкретный адаптер `HttpHttpClientAdapter` на базе `package:http`.
 - Простая авторизация:
-  - API key в header/query (строки из `AuthConfig`).
-  - Bearer token из `AuthConfig` (пока без env‑подстановок).
+  - ✅ API key в header/query (строки из `AuthConfig`).
+  - ✅ Bearer token из `AuthConfig` (пока без env‑подстановок).
 
-### 0.1.2 Разбор спеки и простейшая генерация
+### 0.1.2 Разбор спеки и простейшая генерация ✅
 
-- `spec_loader.dart` — минимум, чтобы прочитать OpenAPI/Swagger и пройтись по `paths`.
-- `client_generator.dart`:
-  - Генерация одного общего `ApiClient` с геттерами на ресурсные классы (`UsersApi`, `OrdersApi`, …).
-- `endpoint_method_generator.dart` (простейший вариант):
-  - Методы для `GET`/`POST` без сложных кейсов:
-    - path‑параметры, query‑параметры (примитивные типы).
-    - один JSON‑body (один `requestBody` → одна модель).
-    - десериализация ответа в одну модель или `List<Модель>`.
+- ✅ `spec_loader.dart` — минимум, чтобы прочитать OpenAPI/Swagger и пройтись по `paths`.
+- ✅ `client_generator.dart`:
+  - Генерация одного общего `ApiClient` с `DefaultApi` классом.
+- ✅ `endpoint_method_generator.dart`:
+  - Методы для `GET`/`POST`/`PUT`/`DELETE`/`PATCH`:
+    - ✅ path‑параметры, query‑параметры (примитивные типы).
+    - ✅ один JSON‑body (`requestBody` → `Map<String, dynamic>`).
+    - ✅ десериализация ответа: `Future<void>`, `Future<Map<String, dynamic>>`, `Future<List<Map<String, dynamic>>>`.
 
-### 0.1.3 CLI и конфиг (минимум)
+### 0.1.3 CLI и конфиг (минимум) ✅
 
-- `bin/dart_swagger_to_api_client.dart`:
-  - Флаги: `--input`, `--output-dir`, `--config`, `--http-client` (пока только `http`).
-- `dart_swagger_to_api_client.yaml` (минимальный поднабор):
+- ✅ `bin/dart_swagger_to_api_client.dart`:
+  - Флаги: `--input`, `--output-dir`, `--config`, `--verbose`, `--quiet`.
+- ✅ `dart_swagger_to_api_client.yaml` (минимальный поднабор):
   - `input`, `outputDir`, `client.baseUrl`, `client.headers`, `client.auth`.
-- Приоритет: **CLI > config > defaults** (как в `dart_swagger_to_models`).
+- ✅ Приоритет: **CLI > config > defaults** (как в `dart_swagger_to_models`).
 
-### 0.1.4 Пример и smoke‑тест
+### 0.1.4 Пример и smoke‑тест ✅
 
-- Пример в `example/`:
-  - Использует уже сгенерированные модели из `dart_swagger_to_models`.
-  - Генерирует в `lib/api_client/` клиента.
-  - Делает один удачный вызов (или мок, если нет реального API).
+- ✅ Пример в `example/`:
+  - Минимальная OpenAPI‑спека для тестирования.
+  - Генерация в `example/generated/` клиента.
 
 ## v0.2 — Укрепление ядра и расширение HTTP‑слоя
 
 **Цель**: сделать ядро пригодным для реального прод‑использования.
 
-### 0.2.1 Расширение `HttpClientAdapter`
+**Статус**: ⚠️ Частично реализовано (0.2.1, 0.2.2 частично, 0.2.3 полностью)
 
-- Добавить:
-  - поддержку таймаутов (из `ApiClientConfig.timeout`);
-  - возможность проброса «сырого» клиента (например, `http.Client`).
-- Ввести базовую стратегию обработки ошибок:
-  - маппинг статусов (2xx / 4xx / 5xx) → свои исключения
-    (`ApiClientException`, `ApiServerException`, `ApiAuthException` и т.п.).
+### 0.2.1 Расширение `HttpClientAdapter` ⚠️ Частично
 
-### 0.2.2 Улучшение генерации endpoint‑методов
+- ✅ Возможность проброса «сырого» клиента (`http.Client`).
+- ✅ Базовая стратегия обработки ошибок:
+  - ✅ маппинг статусов (2xx / 4xx / 5xx) → свои исключения
+    (`ApiClientException`, `ApiServerException`, `ApiAuthException`).
+- ❌ Поддержка таймаутов (из `ApiClientConfig.timeout`) — **TODO**: нужно интегрировать в `HttpHttpClientAdapter.send()`.
 
-- Поддержка:
-  - нескольких `response` схем (выбор по коду 200/201/204);
-  - `204 No Content`;
-  - `application/x-www-form-urlencoded` / простых форм.
-- Улучшение сигнатур методов:
-  - явное разделение `required` / `optional` аргументов;
-  - `Future<void>` для методов без полезного тела ответа.
+### 0.2.2 Улучшение генерации endpoint‑методов ⚠️ Частично
 
-### 0.2.3 DX и логирование
+- ✅ Поддержка нескольких `response` схем (выбор по коду 200/201/204).
+- ✅ `204 No Content` → `Future<void>`.
+- ✅ Улучшение сигнатур методов:
+  - ✅ явное разделение `required` / `optional` аргументов.
+  - ✅ `Future<void>` для методов без полезного тела ответа.
+- ❌ `application/x-www-form-urlencoded` / простых форм — **TODO**.
 
-- Флаги CLI: `--verbose`, `--quiet`.
-- Человеческие сообщения:
-  - когда endpoint пропущен (unsupported feature);
-  - когда не удалось подобрать модель ответа/запроса.
+### 0.2.3 DX и логирование ✅ ЗАВЕРШЕНО
+
+- ✅ Флаги CLI: `--verbose`, `--quiet`.
+- ✅ Человеческие сообщения:
+  - ✅ валидация спецификации (`SpecValidator`) с детальными предупреждениями;
+  - ✅ когда endpoint пропущен (unsupported feature);
+  - ✅ когда не удалось подобрать модель ответа/запроса.
 
 ## v0.3 — Поддержка нескольких HTTP‑клиентов и кастомизация
 
@@ -129,15 +131,17 @@ dart_swagger_to_api_client — Дорожная карта
   - обнаружение типичных паттернов (query `page`, `limit`, `offset`);
   - генерация helper‑методов (опционально, через флаг).
 
-### 0.4.2 Тесная интеграция с `dart_swagger_to_models`
+### 0.4.2 Тесная интеграция с `dart_swagger_to_models` ⚠️ Частично
 
-- Гарантировать, что:
-  - `dart_swagger_to_api_client` умеет использовать те же спецификации/конфиги, что и `models`
-    (или, минимум, ожидаем совместимый формат).
-- Опциональная «связка»:
-  - режим, при котором `api_client` читает кеш `.dart_swagger_to_models.cache`
-    или конфиг `dart_swagger_to_models.yaml`, чтобы находить пути к сгенерированным моделям
-    и корректно импортировать типы.
+- ✅ Инфраструктура для интеграции:
+  - ✅ `ModelsResolver` интерфейс для разрешения `$ref` → Dart типы.
+  - ✅ `ModelsConfig`, `ModelsConfigLoader` для чтения `dart_swagger_to_models.yaml`.
+  - ✅ `NoOpModelsResolver` как заглушка (используется по умолчанию).
+- ❌ Реальная интеграция:
+  - ❌ Реализация `ModelsResolver`, которая читает кеш `.dart_swagger_to_models.cache`
+    или конфиг `dart_swagger_to_models.yaml`, чтобы находить пути к сгенерированным моделям.
+  - ❌ Генерация методов с реальными типами моделей вместо `Map<String, dynamic>`.
+  - ❌ Автоматическое добавление импортов для моделей.
 
 ### 0.4.3 Документация и примеры
 
@@ -151,9 +155,12 @@ dart_swagger_to_api_client — Дорожная карта
 
 Дальнейшие версии можно развивать итеративно, в духе `dart_swagger_to_models`:
 
-- **0.5.0 Тестовый контур и стабильность**
-  - Интеграционные тесты на фейковый OpenAPI или локальный тестовый сервер.
-  - Регрессионные тесты для разных версий OpenAPI/Swagger.
+- **0.5.0 Тестовый контур и стабильность** ⚠️ Частично
+  - ✅ Unit‑тесты для генераторов (`endpoint_method_generator_test.dart`).
+  - ✅ Интеграционные тесты для полного цикла генерации (`api_client_generator_test.dart`).
+  - ✅ Тесты для конфигурации и валидации.
+  - ❌ Интеграционные тесты на фейковый OpenAPI или локальный тестовый сервер — **TODO**.
+  - ❌ Регрессионные тесты для разных версий OpenAPI/Swagger — **TODO**.
 
 - **0.6.0 Advanced DX**
   - Watch‑режим (`--watch`) для авто‑регенерации клиента.
