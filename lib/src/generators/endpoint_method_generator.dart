@@ -1,14 +1,17 @@
-/// Minimal per-endpoint method generation for v0.1.
+import '../models/models_resolver.dart';
+
+/// Generates endpoint methods for API client classes.
 ///
-/// Right now we purposely support only a very small subset of OpenAPI:
-/// - GET operations;
-/// - without path parameters (no `{id}` segments);
-/// - with a valid `operationId` that can be turned into a Dart method name.
-///
-/// Everything else is ignored for now. This is good enough to validate the
-/// client shape and wire up real methods end-to-end.
+/// At v0.1 this supports GET/POST/PUT/DELETE/PATCH operations with
+/// path/query parameters and requestBody. Future versions will use
+/// [modelsResolver] to generate type-safe methods with real model types
+/// instead of `Map<String, dynamic>`.
 class EndpointMethodGenerator {
-  const EndpointMethodGenerator();
+  const EndpointMethodGenerator({
+    ModelsResolver? modelsResolver,
+  }) : _modelsResolver = modelsResolver ?? const NoOpModelsResolver();
+
+  final ModelsResolver _modelsResolver;
 
   /// Generates Dart method declarations to be placed inside `DefaultApi`.
   String generateDefaultApiMethods(Map<String, dynamic> spec) {

@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 import '../config/config.dart';
 import '../generators/api_client_class_generator.dart';
 import '../generators/endpoint_method_generator.dart';
+import '../models/models_config_loader.dart';
+import '../models/models_resolver.dart';
 import 'spec_loader.dart';
 
 /// High-level API for generating API clients from OpenAPI/Swagger specs.
@@ -45,8 +47,16 @@ class ApiClientGenerator {
       await outputDirectory.create(recursive: true);
     }
 
-    // 4. Generate methods for `DefaultApi` from simple GET operations.
-    final endpointGenerator = EndpointMethodGenerator();
+    // 4. Try to load models configuration (for future integration with
+    //    dart_swagger_to_models). If not found, we continue with NoOpModelsResolver.
+    //    At v0.1, modelsConfig is loaded but not yet used - this prepares the
+    //    infrastructure for v0.4.2 when we'll actually resolve $ref to model types.
+    final effectiveProjectDir = projectDir ?? Directory.current.path;
+    final modelsConfig = await ModelsConfigLoader.load(effectiveProjectDir);
+    final modelsResolver = const NoOpModelsResolver(); // TODO(v0.4.2): implement real resolver when adding dart_swagger_to_models dependency
+
+    // 5. Generate methods for `DefaultApi` from operations.
+    final endpointGenerator = EndpointMethodGenerator(modelsResolver: modelsResolver);
     final defaultApiMethods =
         endpointGenerator.generateDefaultApiMethods(spec).trimRight();
 
