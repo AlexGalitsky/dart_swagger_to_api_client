@@ -1,0 +1,33 @@
+openapi: 3.0.0
+info:
+  title: Test API with Warnings
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      # Missing operationId - will generate warning
+      responses:
+        '200':
+          description: OK
+  /orders:
+    post:
+      operationId: createOrder
+      requestBody:
+        content:
+          multipart/form-data:  # Unsupported content type - will generate warning
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+  /products:
+    get:
+      operationId: getProducts
+      parameters:
+        - name: X-Custom-Header
+          in: header  # Unsupported parameter location - will generate warning
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK

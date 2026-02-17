@@ -8,3 +8,4 @@ export 'src/config/config.dart';
 export 'src/core/http_client_adapter.dart';
 export 'src/core/client_generator.dart';
 export 'src/core/errors.dart';
+export 'src/core/spec_validator.dart';

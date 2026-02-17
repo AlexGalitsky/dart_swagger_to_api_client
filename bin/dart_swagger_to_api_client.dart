@@ -25,6 +25,18 @@ Future<void> main(List<String> arguments) async {
       abbr: 'h',
       negatable: false,
       help: 'Show usage information.',
+    )
+    ..addFlag(
+      'verbose',
+      abbr: 'v',
+      negatable: false,
+      help: 'Show detailed output including warnings.',
+    )
+    ..addFlag(
+      'quiet',
+      abbr: 'q',
+      negatable: false,
+      help: 'Show only errors, suppress warnings.',
     );
 
   late ArgResults argResults;
@@ -76,19 +88,30 @@ Future<void> main(List<String> arguments) async {
     return;
   }
 
+  final verbose = argResults['verbose'] == true;
+  final quiet = argResults['quiet'] == true;
+
   try {
-    // For v0.1 we ignore config/projectDir and just ensure that spec loading
-    // and basic structure checks succeed. The generator-level config is
-    // parsed and merged here for future use.
     await ApiClientGenerator.generateClient(
       inputSpecPath: input,
       outputDir: outputDir,
       config: null,
       projectDir: Directory.current.path,
+      onWarning: quiet
+          ? null
+          : (verbose
+              ? (msg) => stdout.writeln(msg)
+              : null), // In non-verbose mode, warnings are suppressed
     );
+
+    if (verbose) {
+      stdout.writeln('✓ Client generated successfully in $outputDir');
+    }
   } catch (e, stackTrace) {
     stderr.writeln('Generation failed: $e');
-    stderr.writeln(stackTrace);
+    if (verbose) {
+      stderr.writeln(stackTrace);
+    }
     exitCode = 1;
   }
 }

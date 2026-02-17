@@ -8,6 +8,7 @@ import '../generators/endpoint_method_generator.dart';
 import '../models/models_config_loader.dart';
 import '../models/models_resolver.dart';
 import 'spec_loader.dart';
+import 'spec_validator.dart';
 
 /// High-level API for generating API clients from OpenAPI/Swagger specs.
 ///
@@ -21,23 +22,34 @@ class ApiClientGenerator {
   /// - [outputDir]: directory where client code will be written
   /// - [config]: optional configuration (base URL, auth, HTTP adapter hints)
   /// - [projectDir]: project root, to resolve relative paths if needed
+  /// - [onWarning]: optional callback for warning messages (useful for CLI output)
   static Future<void> generateClient({
     required String inputSpecPath,
     required String outputDir,
     ApiClientConfig? config,
     String? projectDir,
+    void Function(String message)? onWarning,
   }) async {
     // 1. Load spec (YAML/JSON → Map<String, dynamic>).
     final spec = await SpecLoader.load(inputSpecPath);
 
-    // 2. For v0.1, just ensure we can see some fundamental OpenAPI keys.
-    final hasPaths = spec['paths'] is Map;
-    if (!hasPaths) {
-      // We keep this message simple for now; future versions will provide
-      // proper diagnostics and linting.
+    // 2. Validate spec and collect issues.
+    final issues = SpecValidator.validate(spec);
+    final errors = issues.where((i) => i.severity == IssueSeverity.error).toList();
+    final warnings = issues.where((i) => i.severity == IssueSeverity.warning).toList();
+
+    // Report warnings if callback is provided.
+    if (warnings.isNotEmpty && onWarning != null) {
+      for (final warning in warnings) {
+        onWarning(warning.toString());
+      }
+    }
+
+    // If there are errors, throw with detailed message.
+    if (errors.isNotEmpty) {
+      final errorMessages = errors.map((e) => e.toString()).join('\n');
       throw StateError(
-        'Spec does not contain a valid "paths" section. '
-        'OpenAPI/Swagger paths are required for client generation.',
+        'Spec validation failed:\n$errorMessages',
       );
     }
 

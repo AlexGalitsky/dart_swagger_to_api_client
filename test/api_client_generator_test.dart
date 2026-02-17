@@ -198,7 +198,10 @@ info:
         throwsA(isA<StateError>().having(
           (e) => e.message,
           'message',
-          contains('paths'),
+          allOf(
+            contains('validation failed'),
+            contains('paths'),
+          ),
         )),
       );
     });
