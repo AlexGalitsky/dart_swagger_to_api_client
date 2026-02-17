@@ -1,0 +1,9 @@
+/// Public entry point for `dart_swagger_to_api_client`.
+///
+/// At v0.1 this package mostly exposes configuration and HTTP abstraction
+/// types that will be used by generated clients.
+library dart_swagger_to_api_client;
+
+export 'src/config/config.dart';
+export 'src/core/http_client_adapter.dart';
+export 'src/core/client_generator.dart';

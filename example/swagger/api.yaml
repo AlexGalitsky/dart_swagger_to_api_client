@@ -1,0 +1,28 @@
+openapi: 3.0.0
+info:
+  title: Example API for dart_swagger_to_api_client
+  version: 0.1.0
+
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      summary: Returns a list of users.
+      responses:
+        '200':
+          description: A JSON object containing users.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+
