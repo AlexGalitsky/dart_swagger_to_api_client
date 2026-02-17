@@ -128,7 +128,14 @@ class EndpointMethodGenerator {
 
         if (pathExpression == null) continue;
 
+        // Detect pagination patterns
+        final hasPagination = _detectPagination(queryParams);
+        
         buffer.writeln('  /// Generated from ${httpMethod.toUpperCase()} $rawPath');
+        if (hasPagination) {
+          buffer.writeln('  ///');
+          buffer.writeln('  /// This endpoint supports pagination via query parameters.');
+        }
         buffer.writeln('  $methodSignature {');
         buffer.writeln("    const _rawPath = '$rawPath';");
         buffer.writeln('    final _path = $pathExpression;');
@@ -247,7 +254,14 @@ class EndpointMethodGenerator {
         // Serialize body if present
         String? bodyExpression;
         if (hasBody) {
-          if (requestBodyContentType == 'application/x-www-form-urlencoded') {
+          if (requestBodyContentType == 'multipart/form-data') {
+            // Multipart/form-data: body is Map<String, dynamic> where values can be
+            // String, File, or List<int>. The adapter will handle conversion to MultipartRequest.
+            // We store the body as-is and let the adapter detect and handle multipart.
+            bodyExpression = 'body';
+            // Don't set Content-Type header - adapter will set it with boundary for multipart
+            // For now, we'll pass the body as Map and adapter will check for File/List<int>
+          } else if (requestBodyContentType == 'application/x-www-form-urlencoded') {
             // Form-urlencoded: convert Map to query string
             buffer.writeln('    final formData = body.entries');
             buffer.writeln(
@@ -408,9 +422,28 @@ class EndpointMethodGenerator {
       case 'boolean':
         return 'bool';
       default:
-        return null;
-    }
+    return null;
   }
+
+  /// Detects pagination patterns in query parameters.
+  ///
+  /// Returns true if the endpoint has typical pagination parameters:
+  /// - `page` or `offset` (for page-based or offset-based pagination)
+  /// - `limit` or `per_page` (for page size)
+  bool _detectPagination(List<_Param> queryParams) {
+    final paramNames = queryParams.map((p) => p.name.toLowerCase()).toSet();
+    
+    // Check for page-based pagination
+    final hasPageParam = paramNames.contains('page') || paramNames.contains('offset');
+    final hasLimitParam = paramNames.contains('limit') || 
+                         paramNames.contains('per_page') || 
+                         paramNames.contains('perPage') ||
+                         paramNames.contains('page_size') ||
+                         paramNames.contains('pageSize');
+    
+    return hasPageParam && hasLimitParam;
+  }
+}
 
   String _buildMethodSignature(
     String methodName,
@@ -446,10 +479,14 @@ class EndpointMethodGenerator {
       params.add('$modifier$type ${p.dartName}');
     }
     if (hasBody) {
-      // For form-urlencoded, use Map<String, String>; for JSON, use model type or Map<String, dynamic>
+      // For form-urlencoded, use Map<String, String>
+      // For multipart/form-data, use Map<String, dynamic> (can contain String, File, List<int>)
+      // For JSON, use model type or Map<String, dynamic>
       final bodyType = requestBodyContentType == 'application/x-www-form-urlencoded'
           ? 'Map<String, String>'
-          : (requestBodyType ?? 'Map<String, dynamic>');
+          : (requestBodyContentType == 'multipart/form-data'
+              ? 'Map<String, dynamic>'
+              : (requestBodyType ?? 'Map<String, dynamic>'));
       params.add('required $bodyType body');
     }
 
@@ -464,9 +501,10 @@ class EndpointMethodGenerator {
 
     final content = requestBody['content'];
     if (content is Map && content.isNotEmpty) {
-      // Check if there's application/json or application/x-www-form-urlencoded
+      // Check if there's application/json, application/x-www-form-urlencoded, or multipart/form-data
       if (content.containsKey('application/json') ||
-          content.containsKey('application/x-www-form-urlencoded')) {
+          content.containsKey('application/x-www-form-urlencoded') ||
+          content.containsKey('multipart/form-data')) {
         return true;
       }
     }
@@ -476,13 +514,18 @@ class EndpointMethodGenerator {
 
   /// Gets the content type for requestBody.
   ///
-  /// Returns 'application/json' or 'application/x-www-form-urlencoded', or null if not found.
+  /// Returns 'application/json', 'application/x-www-form-urlencoded', 'multipart/form-data',
+  /// or null if not found.
   String? _getRequestBodyContentType(Map<dynamic, dynamic> operation) {
     final requestBody = operation['requestBody'];
     if (requestBody is! Map) return null;
 
     final content = requestBody['content'];
     if (content is Map && content.isNotEmpty) {
+      // Priority: multipart/form-data > application/x-www-form-urlencoded > application/json
+      if (content.containsKey('multipart/form-data')) {
+        return 'multipart/form-data';
+      }
       if (content.containsKey('application/x-www-form-urlencoded')) {
         return 'application/x-www-form-urlencoded';
       }
@@ -571,7 +614,7 @@ class EndpointMethodGenerator {
 
   /// Gets the Dart type for requestBody, if it can be resolved from $ref.
   ///
-  /// Only works for JSON content types. Form-urlencoded always uses Map<String, String>.
+  /// Only works for JSON content types. Form-urlencoded always uses Map&lt;String, String&gt;.
   Future<String?> _getRequestBodyType(Map<dynamic, dynamic> operation) async {
     final requestBody = operation['requestBody'];
     if (requestBody is! Map) return null;

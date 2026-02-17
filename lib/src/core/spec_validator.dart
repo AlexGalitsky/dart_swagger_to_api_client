@@ -43,14 +43,14 @@ class SpecValidator {
     final issues = <SpecIssue>[];
 
     pathItem.forEach((method, operation) {
-      if (method is! String || operation is! Map) return;
+      if (operation is! Map<String, dynamic>) return;
 
       final httpMethod = method.toLowerCase();
       if (!['get', 'post', 'put', 'delete', 'patch', 'head', 'options'].contains(httpMethod)) {
         return; // Skip unknown methods
       }
 
-      final op = operation as Map<String, dynamic>;
+      final op = operation;
       final pathToOperation = '/paths/$path/$method';
 
       // Check for operationId (required for generation)
@@ -71,6 +71,7 @@ class SpecValidator {
           final supportedTypes = [
             'application/json',
             'application/x-www-form-urlencoded',
+            'multipart/form-data',
           ];
           final unsupportedTypes = content.keys
               .where((key) => key is String && !supportedTypes.contains(key))

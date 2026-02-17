@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -60,11 +61,68 @@ class HttpHttpClientAdapter implements HttpClientAdapter {
 
   @override
   Future<HttpResponse> send(HttpRequest request) async {
+    // Check if body is a Map that might contain files (multipart/form-data)
+    if (request.body is Map<String, dynamic>) {
+      final bodyMap = request.body as Map<String, dynamic>;
+      // Check if map contains File or List<int> (indicating multipart/form-data)
+      final hasFiles = bodyMap.values.any((value) =>
+          value is File || value is List<int>);
+      
+      if (hasFiles) {
+        // Create multipart request
+        final multipartRequest = http.MultipartRequest(
+          request.method,
+          request.url,
+        );
+        multipartRequest.headers.addAll(request.headers);
+        
+        // Add fields and files
+        for (final entry in bodyMap.entries) {
+          final key = entry.key;
+          final value = entry.value;
+          if (value is File) {
+            final file = await http.MultipartFile.fromPath(key, value.path);
+            multipartRequest.files.add(file);
+          } else if (value is List<int>) {
+            multipartRequest.files.add(
+              http.MultipartFile.fromBytes(key, value),
+            );
+          } else {
+            multipartRequest.fields[key] = value.toString();
+          }
+        }
+        
+        // Apply timeout if specified
+        Future<http.StreamedResponse> sendFuture = _client.send(multipartRequest);
+        if (request.timeout != null) {
+          sendFuture = sendFuture.timeout(
+            request.timeout!,
+            onTimeout: () {
+              throw TimeoutException(
+                'Request to ${request.url} timed out after ${request.timeout}',
+                request.timeout!,
+              );
+            },
+          );
+        }
+        
+        final streamed = await sendFuture;
+        final response = await http.Response.fromStream(streamed);
+        
+        return HttpResponse(
+          statusCode: response.statusCode,
+          headers: Map.unmodifiable(response.headers),
+          body: response.body,
+        );
+      }
+    }
+    
+    // Regular request (JSON, form-urlencoded, or plain text)
     final httpRequest = http.Request(request.method, request.url)
       ..headers.addAll(request.headers);
 
     if (request.body != null) {
-      // For v0.1 we assume body is already correctly encoded (e.g. JSON string).
+      // Body is already correctly encoded (e.g. JSON string, form-urlencoded string).
       httpRequest.body = request.body.toString();
     }
 
