@@ -290,6 +290,151 @@ void main() {
       expect(code, contains("method: 'DELETE'"));
       expect(code, isNot(contains('jsonEncode(body)')));
     });
+
+    test('generates GET with header parameters', () async {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/users': {
+            'get': {
+              'operationId': 'getUsers',
+              'parameters': [
+                {
+                  'name': 'X-Request-ID',
+                  'in': 'header',
+                  'required': true,
+                  'schema': {'type': 'string'},
+                },
+                {
+                  'name': 'X-Client-Version',
+                  'in': 'header',
+                  'required': false,
+                  'schema': {'type': 'string'},
+                },
+              ],
+              'responses': {
+                '200': {
+                  'description': 'OK',
+                  'content': {
+                    'application/json': {
+                      'schema': {'type': 'object'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
+
+      expect(code, contains('Future<Map<String, dynamic>> getUsers({'));
+      expect(code, contains('required String xRequestId'));
+      expect(code, contains('String? xClientVersion'));
+      expect(code, contains("headers['X-Request-ID'] = xRequestId.toString();"));
+      expect(code, contains("if (xClientVersion != null) {"));
+      expect(code, contains("headers['X-Client-Version'] = xClientVersion!.toString();"));
+    });
+
+    test('generates GET with cookie parameters', () async {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/users': {
+            'get': {
+              'operationId': 'getUsers',
+              'parameters': [
+                {
+                  'name': 'sessionId',
+                  'in': 'cookie',
+                  'required': true,
+                  'schema': {'type': 'string'},
+                },
+                {
+                  'name': 'csrfToken',
+                  'in': 'cookie',
+                  'required': false,
+                  'schema': {'type': 'string'},
+                },
+              ],
+              'responses': {
+                '200': {
+                  'description': 'OK',
+                  'content': {
+                    'application/json': {
+                      'schema': {'type': 'object'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
+
+      expect(code, contains('Future<Map<String, dynamic>> getUsers({'));
+      expect(code, contains('required String sessionid')); // camelCase conversion
+      expect(code, contains('String? csrftoken')); // camelCase conversion
+      expect(code, contains("headers['Cookie']"));
+      expect(code, contains("cookieParts.add('sessionId=")); // Original name in cookie
+      expect(code, contains('Uri.encodeComponent'));
+      expect(code, contains(".join('; ')"));
+    });
+
+    test('generates method with header and cookie parameters together', () async {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/users/{id}': {
+            'get': {
+              'operationId': 'getUser',
+              'parameters': [
+                {
+                  'name': 'id',
+                  'in': 'path',
+                  'required': true,
+                  'schema': {'type': 'string'},
+                },
+                {
+                  'name': 'X-Request-ID',
+                  'in': 'header',
+                  'required': true,
+                  'schema': {'type': 'string'},
+                },
+                {
+                  'name': 'sessionId',
+                  'in': 'cookie',
+                  'required': true,
+                  'schema': {'type': 'string'},
+                },
+              ],
+              'responses': {
+                '200': {
+                  'description': 'OK',
+                  'content': {
+                    'application/json': {
+                      'schema': {'type': 'object'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
+
+      expect(code, contains('Future<Map<String, dynamic>> getUser({'));
+      expect(code, contains('required String id'));
+      expect(code, contains('required String xRequestId'));
+      expect(code, contains('required String sessionid')); // camelCase conversion
+      expect(code, contains("headers['X-Request-ID']"));
+      expect(code, contains("headers['Cookie']"));
+    });
   });
 }
 

@@ -67,12 +67,22 @@ class EndpointMethodGenerator {
         final queryParams = params.values
             .where((p) => p.location == 'query')
             .toList(growable: false);
+        final headerParams = params.values
+            .where((p) => p.location == 'header')
+            .toList(growable: false);
+        final cookieParams = params.values
+            .where((p) => p.location == 'cookie')
+            .toList(growable: false);
 
         // All path params must be required and have a supported primitive type.
         if (pathParams.any((p) => !p.required || p.dartType == null)) continue;
 
         // For v0.1 we only support primitive query params as well.
         if (queryParams.any((p) => p.dartType == null)) continue;
+
+        // Header and cookie params must have supported primitive types.
+        if (headerParams.any((p) => p.dartType == null)) continue;
+        if (cookieParams.any((p) => p.dartType == null)) continue;
 
         // Check for requestBody (only for POST/PUT/PATCH, DELETE typically doesn't have body)
         final hasBody = _hasRequestBody(rawOperation);
@@ -107,6 +117,8 @@ class EndpointMethodGenerator {
           methodName,
           pathParams,
           queryParams,
+          headerParams: headerParams,
+          cookieParams: cookieParams,
           responseTypeInfo: responseTypeInfo,
           requestBodyType: requestBodyType,
           requestBodyContentType: requestBodyContentType,
@@ -180,6 +192,41 @@ class EndpointMethodGenerator {
         buffer.writeln('    final headers = <String, String>{');
         buffer.writeln('      ..._config.defaultHeaders,');
         buffer.writeln('    };');
+        
+        // Add header parameters
+        if (headerParams.isNotEmpty) {
+          for (final p in headerParams) {
+            if (p.required) {
+              buffer.writeln("    headers['${p.name}'] = ${p.dartName}.toString();");
+            } else {
+              buffer.writeln("    if (${p.dartName} != null) {");
+              buffer.writeln("      headers['${p.name}'] = ${p.dartName}!.toString();");
+              buffer.writeln('    }');
+            }
+          }
+        }
+        
+        // Add cookie parameters (as Cookie header)
+        if (cookieParams.isNotEmpty) {
+          buffer.writeln('    final cookieParts = <String>[];');
+          for (final p in cookieParams) {
+            if (p.required) {
+              buffer.writeln(
+                "    cookieParts.add('${p.name}=\${Uri.encodeComponent(${p.dartName}.toString())}');",
+              );
+            } else {
+              buffer.writeln("    if (${p.dartName} != null) {");
+              buffer.writeln(
+                "      cookieParts.add('${p.name}=\${Uri.encodeComponent(${p.dartName}!.toString())}');",
+              );
+              buffer.writeln('    }');
+            }
+          }
+          buffer.writeln("    if (cookieParts.isNotEmpty) {");
+          buffer.writeln("      headers['Cookie'] = cookieParts.join('; ');");
+          buffer.writeln('    }');
+        }
+        
         buffer.writeln('    final auth = _config.auth;');
         buffer.writeln('    if (auth != null) {');
         buffer.writeln('      if (auth.bearerToken != null) {');
@@ -321,6 +368,11 @@ class EndpointMethodGenerator {
       final location = rawParam['in'];
       if (name is! String || location is! String) continue;
 
+      // Support path, query, header, and cookie parameters
+      if (!['path', 'query', 'header', 'cookie'].contains(location)) {
+        continue; // Skip unsupported parameter locations
+      }
+
       final schema = rawParam['schema'];
       String? type;
       if (schema is Map) {
@@ -329,6 +381,7 @@ class EndpointMethodGenerator {
       }
 
       final dartType = _mapOpenApiTypeToDart(type);
+      // Path parameters are always required, others depend on 'required' field
       final required = rawParam['required'] == true || location == 'path';
 
       final key = _ParamKey(name: name, location: location);
@@ -362,6 +415,8 @@ class EndpointMethodGenerator {
     String methodName,
     List<_Param> pathParams,
     List<_Param> queryParams, {
+    List<_Param> headerParams = const [],
+    List<_Param> cookieParams = const [],
     required _ResponseTypeInfo responseTypeInfo,
     String? requestBodyType,
     String? requestBodyContentType,
@@ -375,6 +430,16 @@ class EndpointMethodGenerator {
       params.add('required ${p.dartType} ${p.dartName}');
     }
     for (final p in queryParams) {
+      final type = p.required ? p.dartType! : '${p.dartType}?';
+      final modifier = p.required ? 'required ' : '';
+      params.add('$modifier$type ${p.dartName}');
+    }
+    for (final p in headerParams) {
+      final type = p.required ? p.dartType! : '${p.dartType}?';
+      final modifier = p.required ? 'required ' : '';
+      params.add('$modifier$type ${p.dartName}');
+    }
+    for (final p in cookieParams) {
       final type = p.required ? p.dartType! : '${p.dartType}?';
       final modifier = p.required ? 'required ' : '';
       params.add('$modifier$type ${p.dartName}');

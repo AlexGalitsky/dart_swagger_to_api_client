@@ -105,7 +105,7 @@ void main() {
       );
     });
 
-    test('returns warning for unsupported parameter location', () {
+    test('does not warn for supported parameter locations', () {
       final spec = <String, dynamic>{
         'openapi': '3.0.0',
         'info': {'title': 'Test API'},
@@ -119,6 +119,42 @@ void main() {
                   'in': 'header',
                   'schema': {'type': 'string'},
                 },
+                {
+                  'name': 'sessionId',
+                  'in': 'cookie',
+                  'schema': {'type': 'string'},
+                },
+              ],
+              'responses': {'200': {'description': 'OK'}},
+            },
+          },
+        },
+      };
+
+      final issues = SpecValidator.validate(spec);
+      // Should not have warnings about unsupported parameter locations
+      expect(
+        issues.any((i) =>
+            (i.message.contains('header') || i.message.contains('cookie')) &&
+            i.message.contains('unsupported')),
+        isFalse,
+      );
+    });
+
+    test('returns warning for truly unsupported parameter location', () {
+      final spec = <String, dynamic>{
+        'openapi': '3.0.0',
+        'info': {'title': 'Test API'},
+        'paths': {
+          '/users': {
+            'get': {
+              'operationId': 'getUsers',
+              'parameters': [
+                {
+                  'name': 'body',
+                  'in': 'body', // Old Swagger 2.0 style, not supported
+                  'schema': {'type': 'object'},
+                },
               ],
               'responses': {'200': {'description': 'OK'}},
             },
@@ -129,7 +165,7 @@ void main() {
       final issues = SpecValidator.validate(spec);
       expect(issues, hasLength(1));
       expect(issues.first.severity, equals(IssueSeverity.warning));
-      expect(issues.first.message, contains('header'));
+      expect(issues.first.message, contains('body'));
       expect(issues.first.message, contains('unsupported'));
     });
 

@@ -95,12 +95,14 @@ class SpecValidator {
           final param = parameters[i];
           if (param is Map) {
             final location = param['in'];
-            if (location is String && !['path', 'query'].contains(location)) {
+            if (location is String &&
+                !['path', 'query', 'header', 'cookie'].contains(location)) {
               issues.add(SpecIssue(
                 severity: IssueSeverity.warning,
                 message: 'Parameter "${param['name']}" in operation "$httpMethod $path" '
-                    'uses unsupported location "$location". Only "path" and "query" '
-                    'parameters are supported. This parameter will be ignored.',
+                    'uses unsupported location "$location". Only "path", "query", '
+                    '"header", and "cookie" parameters are supported. '
+                    'This parameter will be ignored.',
                 path: '$pathToOperation/parameters[$i]',
               ));
             }
