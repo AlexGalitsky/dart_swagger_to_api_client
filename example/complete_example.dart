@@ -86,17 +86,15 @@ Future<void> main() async {
     print('Status code: ${e.statusCode}');
     print('Please check your request parameters.');
     exitCode = 1;
-  } catch (e) {
+  } catch (e, stackTrace) {
+    // Handle timeout and other unexpected errors
     if (e.toString().contains('timeout') || e.toString().contains('Timeout')) {
-      // Handle timeout errors
       print('Request timed out: $e');
       print('The request took too long. Please check your network connection.');
-      exitCode = 1;
     } else {
-  } catch (e, stackTrace) {
-    // Handle unexpected errors
-    print('Unexpected error: $e');
-    print('Stack trace: $stackTrace');
+      print('Unexpected error: $e');
+      print('Stack trace: $stackTrace');
+    }
     exitCode = 1;
   } finally {
     // 5. Always close the client to free resources

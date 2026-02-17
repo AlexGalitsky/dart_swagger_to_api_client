@@ -17,10 +17,7 @@
 ///    dart run example/error_handling_example.dart
 ///    ```
 
-import 'dart:async';
 import 'dart:io';
-
-import 'dart:async';
 
 import 'package:dart_swagger_to_api_client/dart_swagger_to_api_client.dart';
 
@@ -98,10 +95,15 @@ Future<void> main() async {
       print('   Message: ${e.message}');
       print('   Status Code: ${e.statusCode}');
       print('   Action: Check your request parameters');
-    } on TimeoutException catch (e) {
-      print('❌ Timeout Error:');
-      print('   Message: ${e.message}');
-      print('   Action: Check your network connection or increase timeout');
+    } catch (e) {
+      // Handle timeout and other errors
+      if (e.toString().contains('timeout') || e.toString().contains('Timeout')) {
+        print('❌ Timeout Error:');
+        print('   Message: $e');
+        print('   Action: Check your network connection or increase timeout');
+      } else {
+        rethrow;
+      }
     }
 
     print('\n');
