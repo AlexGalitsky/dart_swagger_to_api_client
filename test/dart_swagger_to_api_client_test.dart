@@ -51,4 +51,5 @@ void main() {
   // Regression and edge cases
   regression_test.main();
   edge_cases_test.main();
+  pagination_test.main();
 }
