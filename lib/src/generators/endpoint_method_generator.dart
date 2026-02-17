@@ -229,9 +229,10 @@ class EndpointMethodGenerator {
         
         buffer.writeln('    final auth = _config.auth;');
         buffer.writeln('    if (auth != null) {');
-        buffer.writeln('      if (auth.bearerToken != null) {');
+        buffer.writeln('      final bearerToken = auth.resolveBearerToken();');
+        buffer.writeln('      if (bearerToken != null) {');
         buffer.writeln(
-          "        headers['Authorization'] = 'Bearer \${auth.bearerToken}';",
+          "        headers['Authorization'] = 'Bearer \$bearerToken';",
         );
         buffer.writeln('      }');
         buffer.writeln(

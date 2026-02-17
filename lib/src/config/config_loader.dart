@@ -17,7 +17,9 @@ class ApiGeneratorConfig {
     this.auth,
     this.httpAdapter,
     this.customAdapterType,
-  }) : headers = Map.unmodifiable(headers ?? const {});
+    Map<String, EnvironmentProfile>? environments,
+  })  : headers = Map.unmodifiable(headers ?? const {}),
+        environments = Map.unmodifiable(environments ?? const {});
 
   /// Path to OpenAPI/Swagger spec.
   final String? input;
@@ -39,6 +41,27 @@ class ApiGeneratorConfig {
 
   /// For `custom` adapter: Dart type name implementing `HttpClientAdapter`.
   final String? customAdapterType;
+
+  /// Environment profiles (dev, staging, prod, etc.).
+  final Map<String, EnvironmentProfile> environments;
+}
+
+/// Environment profile configuration.
+class EnvironmentProfile {
+  EnvironmentProfile({
+    this.baseUrl,
+    Map<String, String>? headers,
+    this.auth,
+  }) : headers = Map.unmodifiable(headers ?? const {});
+
+  /// Base URL for this environment.
+  final Uri? baseUrl;
+
+  /// Default headers for this environment.
+  final Map<String, String> headers;
+
+  /// Authentication settings for this environment.
+  final AuthConfig? auth;
 }
 
 class ConfigLoader {
@@ -94,11 +117,24 @@ class ConfigLoader {
           apiKeyHeader: readString(authNode, 'apiKeyHeader'),
           apiKeyQuery: readString(authNode, 'apiKeyQuery'),
           apiKey: readString(authNode, 'apiKey'),
-          // We intentionally ignore bearerTokenEnv at v0.1 and allow
-          // only direct bearerToken value for simplicity.
           bearerToken: readString(authNode, 'bearerToken'),
+          bearerTokenEnv: readString(authNode, 'bearerTokenEnv'),
         );
       }
+    }
+
+    // Load environment profiles
+    final environments = <String, EnvironmentProfile>{};
+    final environmentsNode = yamlDoc['environments'];
+    if (environmentsNode is Map) {
+      environmentsNode.forEach((key, value) {
+        if (key is String && value is Map) {
+          final profile = _loadEnvironmentProfile(value);
+          if (profile != null) {
+            environments[key] = profile;
+          }
+        }
+      });
     }
 
     String? httpAdapter;
@@ -117,6 +153,50 @@ class ConfigLoader {
       auth: auth,
       httpAdapter: httpAdapter,
       customAdapterType: customAdapterType,
+      environments: environments,
+    );
+  }
+
+  /// Loads an environment profile from a YAML node.
+  static EnvironmentProfile? _loadEnvironmentProfile(Map<dynamic, dynamic> node) {
+    String? readString(Map<dynamic, dynamic> map, String key) {
+      final value = map[key];
+      return value is String ? value : null;
+    }
+
+    Uri? baseUrl;
+    final baseUrlStr = readString(node, 'baseUrl');
+    if (baseUrlStr != null && baseUrlStr.isNotEmpty) {
+      baseUrl = Uri.tryParse(baseUrlStr);
+    }
+
+    Map<String, String>? headers;
+    final headersNode = node['headers'];
+    if (headersNode is Map) {
+      headers = <String, String>{};
+      headersNode.forEach((key, value) {
+        if (key != null && value is String) {
+          headers![key.toString()] = value;
+        }
+      });
+    }
+
+    AuthConfig? auth;
+    final authNode = node['auth'];
+    if (authNode is Map) {
+      auth = AuthConfig(
+        apiKeyHeader: readString(authNode, 'apiKeyHeader'),
+        apiKeyQuery: readString(authNode, 'apiKeyQuery'),
+        apiKey: readString(authNode, 'apiKey'),
+        bearerToken: readString(authNode, 'bearerToken'),
+        bearerTokenEnv: readString(authNode, 'bearerTokenEnv'),
+      );
+    }
+
+    return EnvironmentProfile(
+      baseUrl: baseUrl,
+      headers: headers,
+      auth: auth,
     );
   }
 }

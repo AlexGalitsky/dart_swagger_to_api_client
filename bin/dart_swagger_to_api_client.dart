@@ -37,6 +37,10 @@ Future<void> main(List<String> arguments) async {
       abbr: 'q',
       negatable: false,
       help: 'Show only errors, suppress warnings.',
+    )
+    ..addOption(
+      'env',
+      help: 'Environment profile to use (e.g., dev, staging, prod).',
     );
 
   late ArgResults argResults;
@@ -90,12 +94,55 @@ Future<void> main(List<String> arguments) async {
 
   final verbose = argResults['verbose'] == true;
   final quiet = argResults['quiet'] == true;
+  final env = argResults['env'] as String?;
+
+  // Resolve environment profile if specified
+  EnvironmentProfile? selectedProfile;
+  if (env != null && env.isNotEmpty) {
+    if (fileConfig == null) {
+      stderr.writeln(
+        'Warning: --env specified but no config file found. '
+        'Environment profiles are only available when using --config.',
+      );
+    } else {
+      selectedProfile = fileConfig.environments[env];
+      if (selectedProfile == null) {
+        stderr.writeln(
+          'Warning: Environment profile "$env" not found in config. '
+          'Available profiles: ${fileConfig.environments.keys.join(", ")}',
+        );
+      } else if (verbose) {
+        stdout.writeln('Using environment profile: $env');
+      }
+    }
+  }
+
+  // Build ApiClientConfig from config file and selected profile
+  ApiClientConfig? clientConfig;
+  if (fileConfig != null || selectedProfile != null) {
+    // Merge base config with environment profile (profile overrides base)
+    final effectiveBaseUrl =
+        selectedProfile?.baseUrl ?? fileConfig?.baseUrl;
+    final effectiveHeaders = <String, String>{
+      ...(fileConfig?.headers ?? {}),
+      ...(selectedProfile?.headers ?? {}),
+    };
+    final effectiveAuth = selectedProfile?.auth ?? fileConfig?.auth;
+
+    if (effectiveBaseUrl != null) {
+      clientConfig = ApiClientConfig(
+        baseUrl: effectiveBaseUrl,
+        defaultHeaders: effectiveHeaders,
+        auth: effectiveAuth,
+      );
+    }
+  }
 
   try {
     await ApiClientGenerator.generateClient(
       inputSpecPath: input,
       outputDir: outputDir,
-      config: null,
+      config: clientConfig,
       projectDir: Directory.current.path,
       onWarning: quiet
           ? null

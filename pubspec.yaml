@@ -12,6 +12,7 @@ dependencies:
   path: ^1.9.1
   args: ^2.7.0
   dio: ^5.4.0
+  meta: ^1.14.0
 
 dev_dependencies:
   lints: ^6.0.0

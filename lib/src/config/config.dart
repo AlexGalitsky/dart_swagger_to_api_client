@@ -3,7 +3,10 @@
 /// This layer is intentionally small and stable: it is used both by the
 /// code generator and by the generated clients at runtime.
 
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
+import 'package:meta/meta.dart';
 
 import '../core/http_client_adapter.dart';
 
@@ -25,16 +28,46 @@ class AuthConfig {
 
   /// Static bearer token value.
   ///
-  /// Future versions may support indirection via env/secure storage,
-  /// but for v0.1 a plain string is enough.
+  /// If both [bearerToken] and [bearerTokenEnv] are provided,
+  /// [bearerToken] takes precedence.
   final String? bearerToken;
+
+  /// Environment variable name for bearer token.
+  ///
+  /// The token will be read from the environment variable at runtime.
+  /// If the variable is not set, authentication will fail.
+  final String? bearerTokenEnv;
 
   const AuthConfig({
     this.apiKeyHeader,
     this.apiKeyQuery,
     this.apiKey,
     this.bearerToken,
+    this.bearerTokenEnv,
   });
+
+  /// Resolves the bearer token value.
+  ///
+  /// Returns [bearerToken] if set, otherwise reads from [bearerTokenEnv]
+  /// environment variable. Returns `null` if neither is set or if
+  /// [bearerTokenEnv] is set but the environment variable is not found.
+  String? resolveBearerToken() {
+    if (bearerToken != null) {
+      return bearerToken;
+    }
+    if (bearerTokenEnv != null) {
+      return _getEnv(bearerTokenEnv!);
+    }
+    return null;
+  }
+
+  /// Gets environment variable value.
+  ///
+  /// This is a separate method to allow for easier testing.
+  @visibleForTesting
+  static String? _getEnv(String name) {
+    return Platform.environment[name];
+  }
 }
 
 /// High-level configuration for a generated API client.
