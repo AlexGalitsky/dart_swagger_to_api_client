@@ -41,6 +41,7 @@ dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
 - `--config` / `-c`: Путь к файлу конфигурации `dart_swagger_to_api_client.yaml` (опционально).
 - `--verbose` / `-v`: Показывать подробный вывод, включая предупреждения валидации.
 - `--quiet` / `-q`: Показывать только ошибки, скрывать предупреждения.
+- `--env`: Выбрать профиль окружения из конфигурационного файла (например, `dev`, `staging`, `prod`).
 - `--help` / `-h`: Показать справку по использованию.
 
 ### Валидация спецификации
@@ -54,6 +55,53 @@ dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
   - Неподдерживаемые локации параметров (только `path` и `query`)
 
 Предупреждения выводятся при использовании флага `--verbose` или по умолчанию (если не указан `--quiet`).
+
+### Профили окружений
+
+Вы можете определить несколько профилей окружений в конфигурационном файле:
+
+```yaml
+client:
+  baseUrl: https://api.example.com
+  headers:
+    User-Agent: my-app/1.0.0
+
+environments:
+  dev:
+    baseUrl: https://dev-api.example.com
+    headers:
+      X-Environment: dev
+  staging:
+    baseUrl: https://staging-api.example.com
+    headers:
+      X-Environment: staging
+  prod:
+    baseUrl: https://api.example.com
+    auth:
+      bearerTokenEnv: PROD_BEARER_TOKEN
+```
+
+Затем используйте флаг `--env` для выбора профиля:
+
+```bash
+dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
+  --input swagger/api.yaml \
+  --output-dir lib/api_client \
+  --config dart_swagger_to_api_client.yaml \
+  --env prod
+```
+
+### Bearer Token из переменных окружения
+
+Вы можете указать переменную окружения для bearer token вместо прямого значения:
+
+```yaml
+client:
+  auth:
+    bearerTokenEnv: API_BEARER_TOKEN  # Читается из переменной окружения
+```
+
+Токен будет автоматически читаться из переменной окружения во время выполнения.
 
 После этого в директории `lib/api_client` появится файл `api_client.dart`
 со следующим паттерном:
