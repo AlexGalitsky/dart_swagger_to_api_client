@@ -189,6 +189,9 @@ final config = ApiClientConfig(
   httpClientAdapter: adapter,
 );
 
+// Или использование кастомного адаптера
+// (см. раздел "Using Custom Adapters" ниже)
+
 final client = ApiClient(config);
 
 // Если в спецификации есть GET-эндпоинт с operationId `getUser`,
