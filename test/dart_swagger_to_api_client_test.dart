@@ -15,6 +15,7 @@ import 'config_loader_test.dart' as config_loader_test;
 import 'custom_adapter_test.dart' as custom_adapter_test;
 import 'dio_http_client_adapter_test.dart' as dio_adapter_test;
 import 'multipart_test.dart' as multipart_test;
+import 'pagination_test.dart' as pagination_test;
 import 'edge_cases_test.dart' as edge_cases_test;
 import 'endpoint_method_generator_test.dart' as endpoint_generator_test;
 import 'file_based_models_resolver_test.dart' as models_resolver_test;
