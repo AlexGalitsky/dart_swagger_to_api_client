@@ -109,6 +109,134 @@ void main() {
       expect(code, isNot(contains('jsonDecode(')));
       expect(code, contains('return;'));
     });
+
+    test('generates POST method with requestBody', () {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/users': {
+            'post': {
+              'operationId': 'createUser',
+              'requestBody': {
+                'required': true,
+                'content': {
+                  'application/json': {
+                    'schema': {
+                      'type': 'object',
+                    },
+                  },
+                },
+              },
+              'responses': {
+                '201': {
+                  'description': 'Created',
+                  'content': {
+                    'application/json': {
+                      'schema': {
+                        'type': 'object',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final code = generator.generateDefaultApiMethods(spec);
+
+      expect(code, contains('Future<Map<String, dynamic>> createUser({'));
+      expect(code, contains('required Map<String, dynamic> body'));
+      expect(code, contains("/// Generated from POST /users"));
+      expect(code, contains("method: 'POST'"));
+      expect(code, contains('final bodyJson = jsonEncode(body);'));
+      expect(code, contains('body: bodyJson,'));
+    });
+
+    test('generates PUT method with requestBody and path params', () {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/users/{id}': {
+            'put': {
+              'operationId': 'updateUser',
+              'parameters': [
+                {
+                  'name': 'id',
+                  'in': 'path',
+                  'required': true,
+                  'schema': {'type': 'string'},
+                },
+              ],
+              'requestBody': {
+                'required': true,
+                'content': {
+                  'application/json': {
+                    'schema': {
+                      'type': 'object',
+                    },
+                  },
+                },
+              },
+              'responses': {
+                '200': {
+                  'description': 'OK',
+                  'content': {
+                    'application/json': {
+                      'schema': {
+                        'type': 'object',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final code = generator.generateDefaultApiMethods(spec);
+
+      expect(code, contains('Future<Map<String, dynamic>> updateUser({'));
+      expect(code, contains('required String id'));
+      expect(code, contains('required Map<String, dynamic> body'));
+      expect(code, contains("/// Generated from PUT /users/{id}"));
+      expect(code, contains("method: 'PUT'"));
+      expect(code, contains('final bodyJson = jsonEncode(body);'));
+    });
+
+    test('generates DELETE method without requestBody', () {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/users/{id}': {
+            'delete': {
+              'operationId': 'deleteUser',
+              'parameters': [
+                {
+                  'name': 'id',
+                  'in': 'path',
+                  'required': true,
+                  'schema': {'type': 'string'},
+                },
+              ],
+              'responses': {
+                '204': {
+                  'description': 'No Content',
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final code = generator.generateDefaultApiMethods(spec);
+
+      expect(code, contains('Future<void> deleteUser({'));
+      expect(code, contains('required String id'));
+      expect(code, isNot(contains('required Map<String, dynamic> body')));
+      expect(code, contains("/// Generated from DELETE /users/{id}"));
+      expect(code, contains("method: 'DELETE'"));
+      expect(code, isNot(contains('jsonEncode(body)')));
+    });
   });
 }
 

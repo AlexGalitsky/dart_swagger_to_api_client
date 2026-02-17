@@ -24,7 +24,11 @@ class EndpointMethodGenerator {
 
       rawPathItem.forEach((rawMethod, rawOperation) {
         if (rawMethod is! String || rawOperation is! Map) return;
-        if (rawMethod.toLowerCase() != 'get') return;
+        final httpMethod = rawMethod.toLowerCase();
+        // Support GET, POST, PUT, DELETE, PATCH
+        if (!['get', 'post', 'put', 'delete', 'patch'].contains(httpMethod)) {
+          return;
+        }
 
         final operationId = rawOperation['operationId'];
         if (operationId is! String || operationId.isEmpty) return;
@@ -54,18 +58,30 @@ class EndpointMethodGenerator {
         // For v0.1 we only support primitive query params as well.
         if (queryParams.any((p) => p.dartType == null)) return;
 
+        // Check for requestBody (only for POST/PUT/PATCH, DELETE typically doesn't have body)
+        final hasBody = _hasRequestBody(rawOperation);
+        if (hasBody && !['post', 'put', 'patch'].contains(httpMethod)) {
+          // Skip methods that have requestBody but shouldn't (e.g., GET with body)
+          return;
+        }
+        // For POST/PUT/PATCH, require requestBody in v0.1
+        if (['post', 'put', 'patch'].contains(httpMethod) && !hasBody) {
+          return;
+        }
+
         final responseKind = _classifyResponse(rawOperation);
         final methodSignature = _buildMethodSignature(
           methodName,
           pathParams,
           queryParams,
           responseKind: responseKind,
+          hasBody: hasBody,
         );
         final pathExpression = _buildInterpolatedPath(rawPath, pathParams);
 
         if (pathExpression == null) return;
 
-        buffer.writeln('  /// Generated from GET $rawPath');
+        buffer.writeln('  /// Generated from ${httpMethod.toUpperCase()} $rawPath');
         buffer.writeln('  $methodSignature {');
         buffer.writeln("    const _rawPath = '$rawPath';");
         buffer.writeln('    final _path = $pathExpression;');
@@ -145,10 +161,20 @@ class EndpointMethodGenerator {
         buffer.writeln('      }');
         buffer.writeln('    }');
         buffer.writeln();
+        // Serialize body if present
+        String? bodyExpression;
+        if (hasBody) {
+          buffer.writeln('    final bodyJson = jsonEncode(body);');
+          bodyExpression = 'bodyJson';
+        }
+
         buffer.writeln('    final request = HttpRequest(');
-        buffer.writeln("      method: 'GET',");
+        buffer.writeln("      method: '${httpMethod.toUpperCase()}',");
         buffer.writeln('      url: uri,');
         buffer.writeln('      headers: headers,');
+        if (bodyExpression != null) {
+          buffer.writeln('      body: $bodyExpression,');
+        }
         buffer.writeln('    );');
         buffer.writeln();
         buffer.writeln(
@@ -264,7 +290,7 @@ class EndpointMethodGenerator {
     String methodName,
     List<_Param> pathParams,
     List<_Param> queryParams,
-    {required _ResponseKind responseKind}) {
+    {required _ResponseKind responseKind, required bool hasBody}) {
     final buffer = StringBuffer();
     if (responseKind == _ResponseKind.voidResponse) {
       buffer.write('Future<void> $methodName({');
@@ -283,10 +309,28 @@ class EndpointMethodGenerator {
       final modifier = p.required ? 'required ' : '';
       params.add('$modifier$type ${p.dartName}');
     }
+    if (hasBody) {
+      params.add('required Map<String, dynamic> body');
+    }
 
     buffer.write(params.join(', '));
     buffer.write('}) async');
     return buffer.toString();
+  }
+
+  bool _hasRequestBody(Map<dynamic, dynamic> operation) {
+    final requestBody = operation['requestBody'];
+    if (requestBody is! Map) return false;
+
+    final content = requestBody['content'];
+    if (content is Map && content.isNotEmpty) {
+      // Check if there's application/json content type
+      if (content.containsKey('application/json')) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   _ResponseKind _classifyResponse(Map<dynamic, dynamic> operation) {

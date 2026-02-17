@@ -233,5 +233,48 @@ paths:
       expect(content, contains('No suitable GET endpoints'));
       expect(content, isNot(contains('createUser')));
     });
+
+    test('generates POST method with requestBody', () async {
+      final specFile = File(p.join(specDir.path, 'api.yaml'));
+      await specFile.writeAsString('''
+openapi: 3.0.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    post:
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+''');
+
+      await ApiClientGenerator.generateClient(
+        inputSpecPath: specFile.path,
+        outputDir: outputDir.path,
+        config: null,
+        projectDir: tempDir.path,
+      );
+
+      final outputFile = File(p.join(outputDir.path, 'api_client.dart'));
+      final content = await outputFile.readAsString();
+      expect(content, contains('Future<Map<String, dynamic>> createUser({'));
+      expect(content, contains('required Map<String, dynamic> body'));
+      expect(content, contains("/// Generated from POST /users"));
+      expect(content, contains("method: 'POST'"));
+      expect(content, contains('final bodyJson = jsonEncode(body);'));
+      expect(content, contains('body: bodyJson,'));
+    });
   });
 }
