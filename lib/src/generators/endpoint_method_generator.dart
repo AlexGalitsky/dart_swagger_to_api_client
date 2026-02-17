@@ -128,14 +128,7 @@ class EndpointMethodGenerator {
 
         if (pathExpression == null) continue;
 
-        // Detect pagination patterns
-        final hasPagination = _detectPagination(queryParams);
-        
         buffer.writeln('  /// Generated from ${httpMethod.toUpperCase()} $rawPath');
-        if (hasPagination) {
-          buffer.writeln('  ///');
-          buffer.writeln('  /// This endpoint supports pagination via query parameters.');
-        }
         buffer.writeln('  $methodSignature {');
         buffer.writeln("    const _rawPath = '$rawPath';");
         buffer.writeln('    final _path = $pathExpression;');
