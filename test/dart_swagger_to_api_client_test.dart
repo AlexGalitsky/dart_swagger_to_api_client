@@ -21,8 +21,10 @@ import 'endpoint_method_generator_test.dart' as endpoint_generator_test;
 import 'file_based_models_resolver_test.dart' as models_resolver_test;
 import 'http_client_adapter_test.dart' as http_adapter_test;
 import 'models_config_loader_test.dart' as models_config_loader_test;
+import 'pagination_test.dart' as pagination_test;
 import 'regression_test.dart' as regression_test;
 import 'spec_validator_test.dart' as spec_validator_test;
+import 'watch_mode_test.dart' as watch_mode_test;
 
 void main() {
   // Core functionality tests
@@ -53,4 +55,5 @@ void main() {
   regression_test.main();
   edge_cases_test.main();
   pagination_test.main();
+  watch_mode_test.main();
 }
