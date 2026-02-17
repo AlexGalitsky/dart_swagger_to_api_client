@@ -69,7 +69,7 @@ class ConfigLoader {
 
     Uri? baseUrl;
     final clientNode = yamlDoc['client'];
-    Map<String, dynamic>? headers;
+    Map<String, String>? headers;
     AuthConfig? auth;
 
     if (clientNode is Map) {

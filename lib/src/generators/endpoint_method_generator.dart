@@ -54,12 +54,12 @@ class EndpointMethodGenerator {
         // For v0.1 we only support primitive query params as well.
         if (queryParams.any((p) => p.dartType == null)) return;
 
-        final returnsVoid = _isVoidResponse(rawOperation);
+        final responseKind = _classifyResponse(rawOperation);
         final methodSignature = _buildMethodSignature(
           methodName,
           pathParams,
           queryParams,
-          returnsVoid: returnsVoid,
+          responseKind: responseKind,
         );
         final pathExpression = _buildInterpolatedPath(rawPath, pathParams);
 
@@ -189,13 +189,20 @@ class EndpointMethodGenerator {
         );
         buffer.writeln('    }');
         buffer.writeln();
-        if (returnsVoid) {
+        if (responseKind == _ResponseKind.voidResponse) {
           buffer.writeln('    return;');
-        } else {
+        } else if (responseKind == _ResponseKind.mapResponse) {
           buffer.writeln(
             '    final json = jsonDecode(response.body) as Map<String, dynamic>;',
           );
           buffer.writeln('    return json;');
+        } else {
+          buffer.writeln(
+            '    final list = jsonDecode(response.body) as List<dynamic>;',
+          );
+          buffer.writeln(
+            '    return list.cast<Map<String, dynamic>>();',
+          );
         }
         buffer.writeln('  }');
         buffer.writeln();
@@ -257,13 +264,14 @@ class EndpointMethodGenerator {
     String methodName,
     List<_Param> pathParams,
     List<_Param> queryParams,
-    {required bool returnsVoid},
-  ) {
+    {required _ResponseKind responseKind}) {
     final buffer = StringBuffer();
-    if (returnsVoid) {
+    if (responseKind == _ResponseKind.voidResponse) {
       buffer.write('Future<void> $methodName({');
-    } else {
+    } else if (responseKind == _ResponseKind.mapResponse) {
       buffer.write('Future<Map<String, dynamic>> $methodName({');
+    } else {
+      buffer.write('Future<List<Map<String, dynamic>>> $methodName({');
     }
 
     final params = <String>[];
@@ -281,26 +289,37 @@ class EndpointMethodGenerator {
     return buffer.toString();
   }
 
-  bool _isVoidResponse(Map<dynamic, dynamic> operation) {
+  _ResponseKind _classifyResponse(Map<dynamic, dynamic> operation) {
     final responses = operation['responses'];
-    if (responses is! Map) return false;
+    if (responses is! Map) return _ResponseKind.mapResponse;
 
     // Explicit 204 response is treated as void.
     if (responses.containsKey('204')) {
-      return true;
+      return _ResponseKind.voidResponse;
     }
 
-    // Otherwise, check primary success response (200/201/202) for empty content.
-    final success =
-        responses['200'] ?? responses['201'] ?? responses['202'];
-    if (success is! Map) return false;
+    // Otherwise, check primary success response (200/201/202).
+    final success = responses['200'] ?? responses['201'] ?? responses['202'];
+    if (success is! Map) return _ResponseKind.mapResponse;
 
     final content = success['content'];
     if (content is! Map || content.isEmpty) {
-      return true;
+      return _ResponseKind.voidResponse;
     }
 
-    return false;
+    // Look at the first media type schema.
+    final firstMedia = content.values.first;
+    if (firstMedia is Map) {
+      final schema = firstMedia['schema'];
+      if (schema is Map) {
+        final type = schema['type'];
+        if (type == 'array') {
+          return _ResponseKind.listOfMapsResponse;
+        }
+      }
+    }
+
+    return _ResponseKind.mapResponse;
   }
 
   String? _buildInterpolatedPath(String rawPath, List<_Param> pathParams) {
@@ -394,5 +413,8 @@ class _Param {
   final String? dartType;
 }
 
-
-
+enum _ResponseKind {
+  voidResponse,
+  mapResponse,
+  listOfMapsResponse,
+}

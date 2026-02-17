@@ -1,3 +1,5 @@
+import 'package:http/http.dart' as http;
+
 /// Abstraction over concrete HTTP implementations (`http`, `dio`, custom).
 ///
 /// Generated clients should depend only on this interface (plus
@@ -44,8 +46,6 @@ abstract class HttpClientAdapter {
 ///
 /// This is the only concrete adapter we ship in v0.1. Future versions
 /// may add `dio` and other adapters.
-import 'package:http/http.dart' as http;
-
 class HttpHttpClientAdapter implements HttpClientAdapter {
   HttpHttpClientAdapter({http.Client? httpClient})
       : _client = httpClient ?? http.Client(),
