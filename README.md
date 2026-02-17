@@ -17,12 +17,78 @@ OpenAPI/Swagger‑спецификаций и моделей, сгенериро
 
 ## Getting started
 
-На v0.1 пакет находится на ранней стадии и генерирует один файл
-`api_client.dart` с минимальным `ApiClient` и `DefaultApi`. Поддерживаются
-простейшие `GET`‑эндпоинты без path‑параметров и с `operationId`.
+`dart_swagger_to_api_client` — генератор типобезопасного HTTP‑клиента из OpenAPI/Swagger спецификаций.
+Пакет работает в связке с `dart_swagger_to_models` для генерации полного стека: модели + API клиент.
 
-Установите пакет как dev‑dependency в своём проекте и подготовьте
-OpenAPI/Swagger‑спеку (`api.yaml` или `api.json`).
+### Быстрый старт (End-to-End)
+
+Полный сценарий использования от спецификации до вызова API:
+
+#### 1. Установка зависимостей
+
+Добавьте пакеты в `pubspec.yaml`:
+
+```yaml
+dev_dependencies:
+  dart_swagger_to_models: ^0.9.0
+  dart_swagger_to_api_client: ^1.0.0
+```
+
+#### 2. Генерация моделей
+
+Сначала сгенерируйте модели из OpenAPI спецификации:
+
+```bash
+dart run dart_swagger_to_models:dart_swagger_to_models \
+  --input swagger/api.yaml \
+  --output-dir lib/models \
+  --style json_serializable
+```
+
+Это создаст модели (например, `User`, `Order`) в директории `lib/models/`.
+
+#### 3. Генерация API клиента
+
+Затем сгенерируйте API клиент:
+
+```bash
+dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
+  --input swagger/api.yaml \
+  --output-dir lib/api_client
+```
+
+Генератор автоматически обнаружит сгенерированные модели и создаст типобезопасные методы.
+
+#### 4. Использование в коде
+
+```dart
+import 'package:my_app/api_client/api_client.dart';
+import 'package:my_app/models/user.dart';
+
+final config = ApiClientConfig(
+  baseUrl: Uri.parse('https://api.example.com'),
+  auth: AuthConfig(
+    bearerToken: 'your-token-here',
+  ),
+);
+
+final client = ApiClient(config);
+
+try {
+  // Типобезопасный вызов API
+  final List<User> users = await client.defaultApi.getUsers();
+  print('Users: $users');
+} finally {
+  await client.close();
+}
+```
+
+### Расширенные примеры
+
+См. директорию `example/` для полных примеров:
+- `complete_example.dart` — полный end-to-end пример
+- `auth_example.dart` — различные методы аутентификации
+- `error_handling_example.dart` — обработка ошибок и retry логика
 
 ## CLI usage
 
@@ -134,8 +200,8 @@ final client = ApiClient(config);
 final userJson = await client.defaultApi.getUser();
 ```
 
-На этом этапе все методы возвращают `Map<String, dynamic>` — привязка к
-конкретным моделям (`User`, `Order` и т.д.) появится на следующих итерациях.
+> **Примечание**: Если вы используете `dart_swagger_to_models` для генерации моделей,
+> методы будут возвращать типобезопасные модели вместо `Map<String, dynamic>`.
 
 ### Управление ресурсами и scoped клиенты
 
