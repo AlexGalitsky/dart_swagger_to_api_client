@@ -45,6 +45,43 @@ class ApiClient {
   /// Future versions will split endpoints into multiple resource classes
   /// (e.g. UsersApi, OrdersApi) based on tags from the OpenAPI spec.
   DefaultApi get defaultApi => DefaultApi(_config);
+
+  /// Closes the underlying HTTP client adapter.
+  ///
+  /// This should be called when the client is no longer needed to free up
+  /// resources. Some adapters (e.g., DioHttpClientAdapter) may need explicit
+  /// cleanup.
+  Future<void> close() async {
+    await _config.httpClientAdapter.close();
+  }
+
+  /// Creates a scoped client with additional headers.
+  ///
+  /// Returns a new [ApiClient] instance that uses the same configuration
+  /// but with additional headers merged into the default headers.
+  /// Headers from [additionalHeaders] override existing headers with the same key.
+  ///
+  /// Example:
+  /// ```dart
+  /// final scopedClient = client.withHeaders({'X-Request-ID': '123'});
+  /// // All requests from scopedClient will include X-Request-ID header
+  /// ```
+  ApiClient withHeaders(Map<String, String> additionalHeaders) {
+    final mergedHeaders = <String, String>{
+      ..._config.defaultHeaders,
+      ...additionalHeaders,
+    };
+    return ApiClient(
+      ApiClientConfig(
+        baseUrl: _config.baseUrl,
+        defaultHeaders: mergedHeaders,
+        timeout: _config.timeout,
+        auth: _config.auth,
+        httpClientAdapter: _config.httpClientAdapter,
+        httpClient: _config.httpClient,
+      ),
+    );
+  }
 }
 
 /// Very small example of a resource class.
