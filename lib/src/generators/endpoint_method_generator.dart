@@ -422,7 +422,8 @@ class EndpointMethodGenerator {
       case 'boolean':
         return 'bool';
       default:
-    return null;
+        return null;
+    }
   }
 
   /// Detects pagination patterns in query parameters.
@@ -437,9 +438,9 @@ class EndpointMethodGenerator {
     final hasPageParam = paramNames.contains('page') || paramNames.contains('offset');
     final hasLimitParam = paramNames.contains('limit') || 
                          paramNames.contains('per_page') || 
-                         paramNames.contains('perPage') ||
+                         paramNames.contains('perpage') ||
                          paramNames.contains('page_size') ||
-                         paramNames.contains('pageSize');
+                         paramNames.contains('pagesize');
     
     return hasPageParam && hasLimitParam;
   }
