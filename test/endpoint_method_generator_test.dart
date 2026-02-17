@@ -5,7 +5,7 @@ void main() {
   group('EndpointMethodGenerator', () {
     final generator = EndpointMethodGenerator();
 
-    test('generates simple GET without params', () {
+    test('generates simple GET without params', () async {
       final spec = <String, dynamic>{
         'paths': {
           '/users': {
@@ -31,7 +31,8 @@ void main() {
         },
       };
 
-      final code = generator.generateDefaultApiMethods(spec);
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
 
       expect(
         code,
@@ -41,7 +42,7 @@ void main() {
       expect(code, contains("final _path = '/users';"));
     });
 
-    test('generates GET with path and query params', () {
+    test('generates GET with path and query params', () async {
       final spec = <String, dynamic>{
         'paths': {
           '/users/{id}': {
@@ -77,7 +78,8 @@ void main() {
         },
       };
 
-      final code = generator.generateDefaultApiMethods(spec);
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
 
       expect(code, contains('Future<Map<String, dynamic>> getUser({'));
       expect(code, contains('required String id'));
@@ -87,7 +89,7 @@ void main() {
       expect(code, contains("queryParameters['page'] = page.toString();"));
     });
 
-    test('generates Future<void> for 204 responses', () {
+    test('generates Future<void> for 204 responses', () async {
       final spec = <String, dynamic>{
         'paths': {
           '/ping': {
@@ -103,14 +105,15 @@ void main() {
         },
       };
 
-      final code = generator.generateDefaultApiMethods(spec);
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
 
       expect(code, contains('Future<void> ping({}) async'));
       expect(code, isNot(contains('jsonDecode(')));
       expect(code, contains('return;'));
     });
 
-    test('generates POST method with requestBody', () {
+    test('generates POST method with requestBody', () async {
       final spec = <String, dynamic>{
         'paths': {
           '/users': {
@@ -143,7 +146,8 @@ void main() {
         },
       };
 
-      final code = generator.generateDefaultApiMethods(spec);
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
 
       expect(code, contains('Future<Map<String, dynamic>> createUser({'));
       expect(code, contains('required Map<String, dynamic> body'));
@@ -153,7 +157,7 @@ void main() {
       expect(code, contains('body: bodyJson,'));
     });
 
-    test('generates PUT method with requestBody and path params', () {
+    test('generates PUT method with requestBody and path params', () async {
       final spec = <String, dynamic>{
         'paths': {
           '/users/{id}': {
@@ -194,7 +198,8 @@ void main() {
         },
       };
 
-      final code = generator.generateDefaultApiMethods(spec);
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
 
       expect(code, contains('Future<Map<String, dynamic>> updateUser({'));
       expect(code, contains('required String id'));
@@ -204,7 +209,7 @@ void main() {
       expect(code, contains('final bodyJson = jsonEncode(body);'));
     });
 
-    test('generates DELETE method without requestBody', () {
+    test('generates DELETE method without requestBody', () async {
       final spec = <String, dynamic>{
         'paths': {
           '/users/{id}': {
@@ -228,7 +233,8 @@ void main() {
         },
       };
 
-      final code = generator.generateDefaultApiMethods(spec);
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
 
       expect(code, contains('Future<void> deleteUser({'));
       expect(code, contains('required String id'));

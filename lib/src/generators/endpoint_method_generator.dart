@@ -14,30 +14,43 @@ class EndpointMethodGenerator {
   final ModelsResolver _modelsResolver;
 
   /// Generates Dart method declarations to be placed inside `DefaultApi`.
-  String generateDefaultApiMethods(Map<String, dynamic> spec) {
+  ///
+  /// Returns a tuple of (methods code, imports set).
+  Future<({String methods, Set<String> imports})> generateDefaultApiMethods(
+    Map<String, dynamic> spec,
+  ) async {
     final paths = spec['paths'];
-    if (paths is! Map) return '';
+    if (paths is! Map) {
+      return (methods: '', imports: <String>{});
+    }
 
     final buffer = StringBuffer();
+    final imports = <String>{};
 
-    paths.forEach((rawPath, rawPathItem) {
-      if (rawPath is! String || rawPathItem is! Map) return;
+    // Process paths sequentially to allow async operations
+    for (final pathEntry in paths.entries) {
+      final rawPath = pathEntry.key;
+      final rawPathItem = pathEntry.value;
+      if (rawPath is! String || rawPathItem is! Map) continue;
 
       final pathItemParameters = _collectParameters(rawPathItem['parameters']);
 
-      rawPathItem.forEach((rawMethod, rawOperation) {
-        if (rawMethod is! String || rawOperation is! Map) return;
+      // Process methods sequentially to allow async operations
+      for (final methodEntry in rawPathItem.entries) {
+        final rawMethod = methodEntry.key;
+        final rawOperation = methodEntry.value;
+        if (rawMethod is! String || rawOperation is! Map) continue;
         final httpMethod = rawMethod.toLowerCase();
         // Support GET, POST, PUT, DELETE, PATCH
         if (!['get', 'post', 'put', 'delete', 'patch'].contains(httpMethod)) {
-          return;
+          continue;
         }
 
         final operationId = rawOperation['operationId'];
-        if (operationId is! String || operationId.isEmpty) return;
+        if (operationId is! String || operationId.isEmpty) continue;
 
         final methodName = _sanitizeMethodName(operationId);
-        if (methodName == null) return;
+        if (methodName == null) continue;
 
         final operationParameters =
             _collectParameters(rawOperation['parameters']);
@@ -56,33 +69,50 @@ class EndpointMethodGenerator {
             .toList(growable: false);
 
         // All path params must be required and have a supported primitive type.
-        if (pathParams.any((p) => !p.required || p.dartType == null)) return;
+        if (pathParams.any((p) => !p.required || p.dartType == null)) continue;
 
         // For v0.1 we only support primitive query params as well.
-        if (queryParams.any((p) => p.dartType == null)) return;
+        if (queryParams.any((p) => p.dartType == null)) continue;
 
         // Check for requestBody (only for POST/PUT/PATCH, DELETE typically doesn't have body)
         final hasBody = _hasRequestBody(rawOperation);
         if (hasBody && !['post', 'put', 'patch'].contains(httpMethod)) {
           // Skip methods that have requestBody but shouldn't (e.g., GET with body)
-          return;
+          continue;
         }
         // For POST/PUT/PATCH, require requestBody in v0.1
         if (['post', 'put', 'patch'].contains(httpMethod) && !hasBody) {
-          return;
+          continue;
         }
 
-        final responseKind = _classifyResponse(rawOperation);
+        final responseTypeInfo = await _classifyResponse(rawOperation);
+        final requestBodyType = await _getRequestBodyType(rawOperation);
+        
+        // Collect imports for model types
+        if (responseTypeInfo.modelType != null) {
+          final importPath = await _modelsResolver.getImportPath(responseTypeInfo.modelType!);
+          if (importPath != null) {
+            imports.add(importPath);
+          }
+        }
+        if (requestBodyType != null) {
+          final importPath = await _modelsResolver.getImportPath(requestBodyType);
+          if (importPath != null) {
+            imports.add(importPath);
+          }
+        }
+        
         final methodSignature = _buildMethodSignature(
           methodName,
           pathParams,
           queryParams,
-          responseKind: responseKind,
+          responseTypeInfo: responseTypeInfo,
+          requestBodyType: requestBodyType,
           hasBody: hasBody,
         );
         final pathExpression = _buildInterpolatedPath(rawPath, pathParams);
 
-        if (pathExpression == null) return;
+        if (pathExpression == null) continue;
 
         buffer.writeln('  /// Generated from ${httpMethod.toUpperCase()} $rawPath');
         buffer.writeln('  $methodSignature {');
@@ -167,7 +197,13 @@ class EndpointMethodGenerator {
         // Serialize body if present
         String? bodyExpression;
         if (hasBody) {
-          buffer.writeln('    final bodyJson = jsonEncode(body);');
+          if (requestBodyType != null) {
+            // Model type - serialize using toJson()
+            buffer.writeln('    final bodyJson = jsonEncode(body.toJson());');
+          } else {
+            // Map type - serialize directly
+            buffer.writeln('    final bodyJson = jsonEncode(body);');
+          }
           bodyExpression = 'bodyJson';
         }
 
@@ -216,9 +252,26 @@ class EndpointMethodGenerator {
         );
         buffer.writeln('    }');
         buffer.writeln();
-        if (responseKind == _ResponseKind.voidResponse) {
+        if (responseTypeInfo.kind == _ResponseKind.voidResponse) {
           buffer.writeln('    return;');
-        } else if (responseKind == _ResponseKind.mapResponse) {
+        } else if (responseTypeInfo.modelType != null) {
+          // Generate deserialization for model type
+          if (responseTypeInfo.isList) {
+            buffer.writeln(
+              '    final list = jsonDecode(response.body) as List<dynamic>;',
+            );
+            buffer.writeln(
+              '    return list.map((json) => ${responseTypeInfo.modelType}.fromJson(json as Map<String, dynamic>)).toList();',
+            );
+          } else {
+            buffer.writeln(
+              '    final json = jsonDecode(response.body) as Map<String, dynamic>;',
+            );
+            buffer.writeln(
+              '    return ${responseTypeInfo.modelType}.fromJson(json);',
+            );
+          }
+        } else if (responseTypeInfo.kind == _ResponseKind.mapResponse) {
           buffer.writeln(
             '    final json = jsonDecode(response.body) as Map<String, dynamic>;',
           );
@@ -233,10 +286,10 @@ class EndpointMethodGenerator {
         }
         buffer.writeln('  }');
         buffer.writeln();
-      });
-    });
+      }
+    }
 
-    return buffer.toString();
+    return (methods: buffer.toString(), imports: imports);
   }
 
   Map<_ParamKey, _Param> _collectParameters(dynamic node) {
@@ -290,16 +343,13 @@ class EndpointMethodGenerator {
   String _buildMethodSignature(
     String methodName,
     List<_Param> pathParams,
-    List<_Param> queryParams,
-    {required _ResponseKind responseKind, required bool hasBody}) {
+    List<_Param> queryParams, {
+    required _ResponseTypeInfo responseTypeInfo,
+    String? requestBodyType,
+    required bool hasBody,
+  }) {
     final buffer = StringBuffer();
-    if (responseKind == _ResponseKind.voidResponse) {
-      buffer.write('Future<void> $methodName({');
-    } else if (responseKind == _ResponseKind.mapResponse) {
-      buffer.write('Future<Map<String, dynamic>> $methodName({');
-    } else {
-      buffer.write('Future<List<Map<String, dynamic>>> $methodName({');
-    }
+    buffer.write('Future<${responseTypeInfo.dartType}> $methodName({');
 
     final params = <String>[];
     for (final p in pathParams) {
@@ -311,7 +361,8 @@ class EndpointMethodGenerator {
       params.add('$modifier$type ${p.dartName}');
     }
     if (hasBody) {
-      params.add('required Map<String, dynamic> body');
+      final bodyType = requestBodyType ?? 'Map<String, dynamic>';
+      params.add('required $bodyType body');
     }
 
     buffer.write(params.join(', '));
@@ -334,22 +385,28 @@ class EndpointMethodGenerator {
     return false;
   }
 
-  _ResponseKind _classifyResponse(Map<dynamic, dynamic> operation) {
+  Future<_ResponseTypeInfo> _classifyResponse(
+    Map<dynamic, dynamic> operation,
+  ) async {
     final responses = operation['responses'];
-    if (responses is! Map) return _ResponseKind.mapResponse;
+    if (responses is! Map) {
+      return _ResponseTypeInfo.mapResponse;
+    }
 
     // Explicit 204 response is treated as void.
     if (responses.containsKey('204')) {
-      return _ResponseKind.voidResponse;
+      return _ResponseTypeInfo.voidResponse;
     }
 
     // Otherwise, check primary success response (200/201/202).
     final success = responses['200'] ?? responses['201'] ?? responses['202'];
-    if (success is! Map) return _ResponseKind.mapResponse;
+    if (success is! Map) {
+      return _ResponseTypeInfo.mapResponse;
+    }
 
     final content = success['content'];
     if (content is! Map || content.isEmpty) {
-      return _ResponseKind.voidResponse;
+      return _ResponseTypeInfo.voidResponse;
     }
 
     // Look at the first media type schema.
@@ -357,14 +414,72 @@ class EndpointMethodGenerator {
     if (firstMedia is Map) {
       final schema = firstMedia['schema'];
       if (schema is Map) {
+        // Check for $ref
+        final ref = schema['\$ref'];
+        if (ref is String) {
+          final modelType = await _modelsResolver.resolveRefToType(ref);
+          if (modelType != null) {
+            final type = schema['type'];
+            if (type == 'array') {
+              return _ResponseTypeInfo(
+                kind: _ResponseKind.listOfMapsResponse,
+                modelType: modelType,
+                isList: true,
+              );
+            }
+            return _ResponseTypeInfo(
+              kind: _ResponseKind.mapResponse,
+              modelType: modelType,
+            );
+          }
+        }
+
+        // Check for array type
         final type = schema['type'];
         if (type == 'array') {
-          return _ResponseKind.listOfMapsResponse;
+          // Check if array items have $ref
+          final items = schema['items'];
+          if (items is Map) {
+            final itemsRef = items['\$ref'];
+            if (itemsRef is String) {
+              final modelType = await _modelsResolver.resolveRefToType(itemsRef);
+              if (modelType != null) {
+                return _ResponseTypeInfo(
+                  kind: _ResponseKind.listOfMapsResponse,
+                  modelType: modelType,
+                  isList: true,
+                );
+              }
+            }
+          }
+          return _ResponseTypeInfo.listOfMapsResponse;
         }
       }
     }
 
-    return _ResponseKind.mapResponse;
+    return _ResponseTypeInfo.mapResponse;
+  }
+
+  /// Gets the Dart type for requestBody, if it can be resolved from $ref.
+  Future<String?> _getRequestBodyType(Map<dynamic, dynamic> operation) async {
+    final requestBody = operation['requestBody'];
+    if (requestBody is! Map) return null;
+
+    final content = requestBody['content'];
+    if (content is! Map && content.isNotEmpty) {
+      final jsonContent = content['application/json'];
+      if (jsonContent is Map) {
+        final schema = jsonContent['schema'];
+        if (schema is Map) {
+          final ref = schema['\$ref'];
+          if (ref is String) {
+            return await _modelsResolver.resolveRefToType(ref);
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   String? _buildInterpolatedPath(String rawPath, List<_Param> pathParams) {
@@ -456,6 +571,40 @@ class _Param {
   final String location; // 'path' or 'query'
   final bool required;
   final String? dartType;
+}
+
+/// Information about the response type for a generated method.
+class _ResponseTypeInfo {
+  const _ResponseTypeInfo({
+    required this.kind,
+    this.modelType,
+    this.isList = false,
+  });
+
+  final _ResponseKind kind;
+  final String? modelType; // Dart type name if resolved from $ref
+  final bool isList; // true if response is List<ModelType>
+
+  static const voidResponse = _ResponseTypeInfo(kind: _ResponseKind.voidResponse);
+  static const mapResponse = _ResponseTypeInfo(kind: _ResponseKind.mapResponse);
+  static const listOfMapsResponse = _ResponseTypeInfo(kind: _ResponseKind.listOfMapsResponse, isList: true);
+
+  String get dartType {
+    switch (kind) {
+      case _ResponseKind.voidResponse:
+        return 'void';
+      case _ResponseKind.mapResponse:
+        if (modelType != null) {
+          return modelType!;
+        }
+        return 'Map<String, dynamic>';
+      case _ResponseKind.listOfMapsResponse:
+        if (modelType != null) {
+          return 'List<$modelType>';
+        }
+        return 'List<Map<String, dynamic>>';
+    }
+  }
 }
 
 enum _ResponseKind {

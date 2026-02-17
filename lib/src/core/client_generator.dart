@@ -74,8 +74,9 @@ class ApiClientGenerator {
 
     // 5. Generate methods for `DefaultApi` from operations.
     final endpointGenerator = EndpointMethodGenerator(modelsResolver: modelsResolver);
-    final defaultApiMethods =
-        endpointGenerator.generateDefaultApiMethods(spec).trimRight();
+    final result = await endpointGenerator.generateDefaultApiMethods(spec);
+    final defaultApiMethods = result.methods.trimRight();
+    final modelImports = result.imports;
 
     // 5. Generate a minimal `api_client.dart` file.
     //
@@ -87,6 +88,7 @@ class ApiClientGenerator {
       defaultApiMethods: defaultApiMethods.isEmpty
           ? '  // No suitable GET endpoints with operationId were found in the spec.\n'
           : '$defaultApiMethods\n',
+      modelImports: modelImports,
     );
 
     final outputPath = p.join(outputDir, 'api_client.dart');
