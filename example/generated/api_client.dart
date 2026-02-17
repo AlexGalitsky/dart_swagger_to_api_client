@@ -28,10 +28,10 @@ class DefaultApi {
 
   final ApiClientConfig _config;
 
-  /// Generated from GET /products
-  Future<void> getProducts({}) async {
-    const _rawPath = '/products';
-    final _path = '/products';
+  /// Generated from GET /users
+  Future<Map<String, dynamic>> getUsers({}) async {
+    const _rawPath = '/users';
+    final _path = '/users';
 
     final auth = _config.auth;
     final queryParameters = <String, String>{};
@@ -57,10 +57,10 @@ class DefaultApi {
       method: 'GET',
       url: uri,
       headers: headers,
+      timeout: _config.timeout,
     );
 
-    final response = await _config.httpClientAdapter
-        .send(request).timeout(_config.timeout);
+    final response = await _config.httpClientAdapter.send(request);
 
     if (response.statusCode == 401 || response.statusCode == 403) {
       throw ApiAuthException('Unauthorized request to $ _rawPath',
@@ -75,7 +75,8 @@ class DefaultApi {
           statusCode: response.statusCode);
     }
 
-    return;
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json;
   }
 
 }

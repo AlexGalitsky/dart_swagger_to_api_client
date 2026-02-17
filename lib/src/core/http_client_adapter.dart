@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:http/http.dart' as http;
 
 /// Abstraction over concrete HTTP implementations (`http`, `dio`, custom).
@@ -12,12 +14,14 @@ class HttpRequest {
   final Uri url;
   final Map<String, String> headers;
   final Object? body;
+  final Duration? timeout;
 
   const HttpRequest({
     required this.method,
     required this.url,
     this.headers = const {},
     this.body,
+    this.timeout,
   });
 }
 
@@ -64,7 +68,21 @@ class HttpHttpClientAdapter implements HttpClientAdapter {
       httpRequest.body = request.body.toString();
     }
 
-    final streamed = await _client.send(httpRequest);
+    // Apply timeout if specified in the request.
+    Future<http.StreamedResponse> sendFuture = _client.send(httpRequest);
+    if (request.timeout != null) {
+      sendFuture = sendFuture.timeout(
+        request.timeout!,
+        onTimeout: () {
+          throw TimeoutException(
+            'Request to ${request.url} timed out after ${request.timeout}',
+            request.timeout!,
+          );
+        },
+      );
+    }
+
+    final streamed = await sendFuture;
     final response = await http.Response.fromStream(streamed);
 
     return HttpResponse(

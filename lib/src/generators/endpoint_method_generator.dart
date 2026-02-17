@@ -178,13 +178,11 @@ class EndpointMethodGenerator {
         if (bodyExpression != null) {
           buffer.writeln('      body: $bodyExpression,');
         }
+        buffer.writeln('      timeout: _config.timeout,');
         buffer.writeln('    );');
         buffer.writeln();
         buffer.writeln(
-          '    final response = await _config.httpClientAdapter',
-        );
-        buffer.writeln(
-          '        .send(request).timeout(_config.timeout);',
+          '    final response = await _config.httpClientAdapter.send(request);',
         );
         buffer.writeln();
         buffer.writeln(
