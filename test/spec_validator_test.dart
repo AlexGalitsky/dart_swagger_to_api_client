@@ -76,6 +76,35 @@ void main() {
       expect(issues.first.message, contains('unsupported'));
     });
 
+    test('does not warn for application/x-www-form-urlencoded', () {
+      final spec = <String, dynamic>{
+        'openapi': '3.0.0',
+        'info': {'title': 'Test API'},
+        'paths': {
+          '/login': {
+            'post': {
+              'operationId': 'login',
+              'requestBody': {
+                'content': {
+                  'application/x-www-form-urlencoded': {
+                    'schema': {'type': 'object'},
+                  },
+                },
+              },
+              'responses': {'200': {'description': 'OK'}},
+            },
+          },
+        },
+      };
+
+      final issues = SpecValidator.validate(spec);
+      // Should not have warnings about unsupported content type
+      expect(
+        issues.any((i) => i.message.contains('application/x-www-form-urlencoded') && i.message.contains('unsupported')),
+        isFalse,
+      );
+    });
+
     test('returns warning for unsupported parameter location', () {
       final spec = <String, dynamic>{
         'openapi': '3.0.0',

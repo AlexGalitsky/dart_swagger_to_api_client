@@ -7,6 +7,7 @@ import 'dart:convert';
 
 import 'package:dart_swagger_to_api_client/dart_swagger_to_api_client.dart';
 
+
 /// Main entry point for working with the API.
 class ApiClient {
   ApiClient(this._config);

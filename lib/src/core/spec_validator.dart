@@ -68,7 +68,10 @@ class SpecValidator {
       if (requestBody is Map) {
         final content = requestBody['content'];
         if (content is Map && content.isNotEmpty) {
-          final supportedTypes = ['application/json'];
+          final supportedTypes = [
+            'application/json',
+            'application/x-www-form-urlencoded',
+          ];
           final unsupportedTypes = content.keys
               .where((key) => key is String && !supportedTypes.contains(key))
               .toList();
@@ -76,7 +79,8 @@ class SpecValidator {
             issues.add(SpecIssue(
               severity: IssueSeverity.warning,
               message: 'Operation "$httpMethod $path" uses unsupported content types: '
-                  '${unsupportedTypes.join(", ")}. Only "application/json" is supported. '
+                  '${unsupportedTypes.join(", ")}. Only "application/json" and '
+                  '"application/x-www-form-urlencoded" are supported. '
                   'The operation will be skipped if it requires requestBody.',
               path: pathToOperation,
             ));

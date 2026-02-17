@@ -87,6 +87,7 @@ class EndpointMethodGenerator {
 
         final responseTypeInfo = await _classifyResponse(rawOperation);
         final requestBodyType = await _getRequestBodyType(rawOperation);
+        final requestBodyContentType = _getRequestBodyContentType(rawOperation);
         
         // Collect imports for model types
         if (responseTypeInfo.modelType != null) {
@@ -108,6 +109,7 @@ class EndpointMethodGenerator {
           queryParams,
           responseTypeInfo: responseTypeInfo,
           requestBodyType: requestBodyType,
+          requestBodyContentType: requestBodyContentType,
           hasBody: hasBody,
         );
         final pathExpression = _buildInterpolatedPath(rawPath, pathParams);
@@ -197,14 +199,30 @@ class EndpointMethodGenerator {
         // Serialize body if present
         String? bodyExpression;
         if (hasBody) {
-          if (requestBodyType != null) {
-            // Model type - serialize using toJson()
-            buffer.writeln('    final bodyJson = jsonEncode(body.toJson());');
+          if (requestBodyContentType == 'application/x-www-form-urlencoded') {
+            // Form-urlencoded: convert Map to query string
+            buffer.writeln('    final formData = body.entries');
+            buffer.writeln(
+              "        .map((e) => '\${Uri.encodeComponent(e.key)}=\${Uri.encodeComponent(e.value)}')",
+            );
+            buffer.writeln("        .join('&');");
+            bodyExpression = 'formData';
+            // Set Content-Type header for form-urlencoded
+            buffer.writeln(
+              "    headers['Content-Type'] = 'application/x-www-form-urlencoded';",
+            );
           } else {
-            // Map type - serialize directly
-            buffer.writeln('    final bodyJson = jsonEncode(body);');
+            // JSON content type (default)
+            if (requestBodyType != null) {
+              // Model type - serialize using toJson()
+              buffer.writeln('    final bodyJson = jsonEncode(body.toJson());');
+            } else {
+              // Map type - serialize directly
+              buffer.writeln('    final bodyJson = jsonEncode(body);');
+            }
+            bodyExpression = 'bodyJson';
+            buffer.writeln("    headers['Content-Type'] = 'application/json';");
           }
-          bodyExpression = 'bodyJson';
         }
 
         buffer.writeln('    final request = HttpRequest(');
@@ -346,6 +364,7 @@ class EndpointMethodGenerator {
     List<_Param> queryParams, {
     required _ResponseTypeInfo responseTypeInfo,
     String? requestBodyType,
+    String? requestBodyContentType,
     required bool hasBody,
   }) {
     final buffer = StringBuffer();
@@ -361,7 +380,10 @@ class EndpointMethodGenerator {
       params.add('$modifier$type ${p.dartName}');
     }
     if (hasBody) {
-      final bodyType = requestBodyType ?? 'Map<String, dynamic>';
+      // For form-urlencoded, use Map<String, String>; for JSON, use model type or Map<String, dynamic>
+      final bodyType = requestBodyContentType == 'application/x-www-form-urlencoded'
+          ? 'Map<String, String>'
+          : (requestBodyType ?? 'Map<String, dynamic>');
       params.add('required $bodyType body');
     }
 
@@ -376,13 +398,34 @@ class EndpointMethodGenerator {
 
     final content = requestBody['content'];
     if (content is Map && content.isNotEmpty) {
-      // Check if there's application/json content type
-      if (content.containsKey('application/json')) {
+      // Check if there's application/json or application/x-www-form-urlencoded
+      if (content.containsKey('application/json') ||
+          content.containsKey('application/x-www-form-urlencoded')) {
         return true;
       }
     }
 
     return false;
+  }
+
+  /// Gets the content type for requestBody.
+  ///
+  /// Returns 'application/json' or 'application/x-www-form-urlencoded', or null if not found.
+  String? _getRequestBodyContentType(Map<dynamic, dynamic> operation) {
+    final requestBody = operation['requestBody'];
+    if (requestBody is! Map) return null;
+
+    final content = requestBody['content'];
+    if (content is Map && content.isNotEmpty) {
+      if (content.containsKey('application/x-www-form-urlencoded')) {
+        return 'application/x-www-form-urlencoded';
+      }
+      if (content.containsKey('application/json')) {
+        return 'application/json';
+      }
+    }
+
+    return null;
   }
 
   Future<_ResponseTypeInfo> _classifyResponse(
@@ -461,12 +504,15 @@ class EndpointMethodGenerator {
   }
 
   /// Gets the Dart type for requestBody, if it can be resolved from $ref.
+  ///
+  /// Only works for JSON content types. Form-urlencoded always uses Map<String, String>.
   Future<String?> _getRequestBodyType(Map<dynamic, dynamic> operation) async {
     final requestBody = operation['requestBody'];
     if (requestBody is! Map) return null;
 
     final content = requestBody['content'];
     if (content is! Map && content.isNotEmpty) {
+      // Only resolve model types for JSON, not for form-urlencoded
       final jsonContent = content['application/json'];
       if (jsonContent is Map) {
         final schema = jsonContent['schema'];

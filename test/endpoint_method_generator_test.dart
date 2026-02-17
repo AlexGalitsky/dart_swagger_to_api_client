@@ -209,6 +209,53 @@ void main() {
       expect(code, contains('final bodyJson = jsonEncode(body);'));
     });
 
+    test('generates POST method with application/x-www-form-urlencoded', () async {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/login': {
+            'post': {
+              'operationId': 'login',
+              'requestBody': {
+                'content': {
+                  'application/x-www-form-urlencoded': {
+                    'schema': {
+                      'type': 'object',
+                      'properties': {
+                        'username': {'type': 'string'},
+                        'password': {'type': 'string'},
+                      },
+                    },
+                  },
+                },
+              },
+              'responses': {
+                '200': {
+                  'description': 'OK',
+                  'content': {
+                    'application/json': {
+                      'schema': {'type': 'object'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
+
+      expect(
+        code,
+        contains('Future<Map<String, dynamic>> login({'),
+      );
+      expect(code, contains('required Map<String, String> body'));
+      expect(code, contains("headers['Content-Type'] = 'application/x-www-form-urlencoded'"));
+      expect(code, contains('Uri.encodeComponent'));
+      expect(code, contains('.join(\'&\')'));
+    });
+
     test('generates DELETE method without requestBody', () async {
       final spec = <String, dynamic>{
         'paths': {
