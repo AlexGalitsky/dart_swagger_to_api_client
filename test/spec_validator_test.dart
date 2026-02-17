@@ -70,11 +70,8 @@ void main() {
       };
 
       final issues = SpecValidator.validate(spec);
-      expect(issues, hasLength(1));
-      expect(issues.first.severity, equals(IssueSeverity.warning));
       // multipart/form-data is now supported, so it should not generate a warning
       expect(issues.isEmpty, isTrue);
-      expect(issues.first.message, contains('unsupported'));
     });
 
     test('does not warn for application/x-www-form-urlencoded', () {
