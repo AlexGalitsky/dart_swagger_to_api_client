@@ -12,6 +12,7 @@ import 'api_client_generator_test.dart' as generator_test;
 import 'auth_config_test.dart' as auth_config_test;
 import 'config_loader_env_test.dart' as config_loader_env_test;
 import 'config_loader_test.dart' as config_loader_test;
+import 'custom_adapter_test.dart' as custom_adapter_test;
 import 'dio_http_client_adapter_test.dart' as dio_adapter_test;
 import 'edge_cases_test.dart' as edge_cases_test;
 import 'endpoint_method_generator_test.dart' as endpoint_generator_test;
@@ -36,6 +37,7 @@ void main() {
   // HTTP adapter tests
   http_adapter_test.main();
   dio_adapter_test.main();
+  custom_adapter_test.main();
 
   // Models integration tests
   models_resolver_test.main();

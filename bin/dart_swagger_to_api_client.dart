@@ -138,6 +138,18 @@ Future<void> main(List<String> arguments) async {
     }
   }
 
+  // Extract custom adapter type from config if using custom adapter
+  String? customAdapterType;
+  if (fileConfig?.httpAdapter == 'custom') {
+    customAdapterType = fileConfig?.customAdapterType;
+    if (customAdapterType == null || customAdapterType.isEmpty) {
+      stderr.writeln(
+        'Warning: Custom adapter specified but customAdapterType is not set. '
+        'Custom adapter documentation will not be included.',
+      );
+    }
+  }
+
   try {
     await ApiClientGenerator.generateClient(
       inputSpecPath: input,
@@ -149,6 +161,7 @@ Future<void> main(List<String> arguments) async {
           : (verbose
               ? (msg) => stdout.writeln(msg)
               : null), // In non-verbose mode, warnings are suppressed
+      customAdapterType: customAdapterType,
     );
 
     if (verbose) {

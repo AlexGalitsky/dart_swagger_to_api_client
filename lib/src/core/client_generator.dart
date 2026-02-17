@@ -24,12 +24,14 @@ class ApiClientGenerator {
   /// - [config]: optional configuration (base URL, auth, HTTP adapter hints)
   /// - [projectDir]: project root, to resolve relative paths if needed
   /// - [onWarning]: optional callback for warning messages (useful for CLI output)
+  /// - [customAdapterType]: optional custom adapter type name (for custom adapters)
   static Future<void> generateClient({
     required String inputSpecPath,
     required String outputDir,
     ApiClientConfig? config,
     String? projectDir,
     void Function(String message)? onWarning,
+    String? customAdapterType,
   }) async {
     // 1. Load spec (YAML/JSON → Map<String, dynamic>).
     final spec = await SpecLoader.load(inputSpecPath);
@@ -89,6 +91,7 @@ class ApiClientGenerator {
           ? '  // No suitable GET endpoints with operationId were found in the spec.\n'
           : '$defaultApiMethods\n',
       modelImports: modelImports,
+      customAdapterType: customAdapterType,
     );
 
     final outputPath = p.join(outputDir, 'api_client.dart');
