@@ -36,13 +36,35 @@ info:
 paths: {}
 ''');
 
-      // Should throw StateError because paths is empty (validation error)
-      await expectLater(
-        ApiClientGenerator.generateClient(
-          inputSpecPath: specFile.path,
-          outputDir: tempDir.path,
-        ),
-        throwsA(isA<StateError>()),
+      // Empty paths should generate a warning, but generation should succeed
+      // with an empty client (no methods)
+      await ApiClientGenerator.generateClient(
+        inputSpecPath: specFile.path,
+        outputDir: tempDir.path,
+        onWarning: (msg) {
+          // Warnings are expected for empty paths
+        },
+      );
+
+      final generatedFile = File('${tempDir.path}/api_client.dart');
+      expect(await generatedFile.exists(), isTrue);
+
+      final content = await generatedFile.readAsString();
+      expect(content, contains('class ApiClient'));
+      expect(content, contains('class DefaultApi'));
+      // Should not have any API methods in DefaultApi (only facade methods in ApiClient)
+      // Check that DefaultApi class doesn't have Future methods (except facade methods)
+      final defaultApiStart = content.indexOf('class DefaultApi');
+      final defaultApiEnd = content.lastIndexOf('}', content.lastIndexOf('}') - 1);
+      final defaultApiContent = content.substring(
+        defaultApiStart,
+        defaultApiEnd > defaultApiStart ? defaultApiEnd : content.length,
+      );
+      // Should not have any Future methods in DefaultApi (only comment about no endpoints)
+      expect(
+        defaultApiContent.contains('No suitable') ||
+            !defaultApiContent.contains('Future<'),
+        isTrue,
       );
     });
 
