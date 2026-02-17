@@ -145,11 +145,11 @@ dart_swagger_to_api_client — Дорожная карта
 - ✅ `requestBody` с несколькими `content` типами:
   - ✅ `application/json` (реализовано в v0.1).
   - ✅ `application/x-www-form-urlencoded` (реализовано в v0.2.2).
-- ✅ `multipart/form-data` — реализовано:
-  - ✅ Поддержка в генераторе (определение content type).
-  - ✅ Обработка в `HttpHttpClientAdapter` (автоматическое создание `MultipartRequest`).
-  - ✅ Поддержка `File` и `List<int>` в body для загрузки файлов.
-  - ✅ Валидатор принимает `multipart/form-data` как поддерживаемый тип.
+  - ✅ `multipart/form-data` — реализовано:
+    - ✅ Поддержка в генераторе (определение content type).
+    - ✅ Обработка в `HttpHttpClientAdapter` (автоматическое создание `MultipartRequest`).
+    - ✅ Поддержка `File` и `List<int>` в body для загрузки файлов.
+    - ✅ Валидатор принимает `multipart/form-data` как поддерживаемый тип.
 - ⚠️ Базовая поддержка пагинации:
   - ❌ Обнаружение типичных паттернов — отложено (можно добавить в будущих версиях).
   - ❌ Генерация helper‑методов — отложено (можно добавить в будущих версиях через флаг).
