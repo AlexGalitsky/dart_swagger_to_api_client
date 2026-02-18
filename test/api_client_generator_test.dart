@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dart_swagger_to_api_client/src/core/client_generator.dart';
+import 'package:dart_swagger_to_api_client/src/core/errors.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -179,7 +180,7 @@ paths:
       expect(outputFile.existsSync(), isTrue);
     });
 
-    test('throws StateError when spec has no paths section', () async {
+    test('throws GenerationException when spec has no paths section', () async {
       final specFile = File(p.join(specDir.path, 'api.yaml'));
       await specFile.writeAsString('''
 openapi: 3.0.0
@@ -188,21 +189,23 @@ info:
   version: 1.0.0
 ''');
 
-      expect(
+      await expectLater(
         () => ApiClientGenerator.generateClient(
           inputSpecPath: specFile.path,
           outputDir: outputDir.path,
           config: null,
           projectDir: tempDir.path,
         ),
-        throwsA(isA<StateError>().having(
-          (e) => e.message,
-          'message',
-          allOf(
-            contains('validation failed'),
-            contains('paths'),
+        throwsA(
+          isA<GenerationException>().having(
+            (e) => e.toString(),
+            'message',
+            allOf(
+              contains('OpenAPI specification validation failed'),
+              contains('paths'),
+            ),
           ),
-        )),
+        ),
       );
     });
 

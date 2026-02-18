@@ -73,6 +73,7 @@ environments:
     headers:
       X-Environment: dev
     auth:
+      apiKeyHeader: X-API-Key
       apiKey: dev-key
 ''';
 
@@ -87,8 +88,9 @@ environments:
         expect(devProfile.baseUrl?.toString(), equals('https://dev-api.example.com'));
         expect(devProfile.headers['X-Environment'], equals('dev'));
         expect(devProfile.auth?.apiKey, equals('dev-key'));
-        // Note: profiles don't inherit auth from base config, they override it completely
-        expect(devProfile.auth?.apiKeyHeader, isNull);
+        // Profiles provide their own auth configuration; in this case the
+        // environment profile defines both apiKeyHeader and apiKey explicitly.
+        expect(devProfile.auth?.apiKeyHeader, equals('X-API-Key'));
       } finally {
         if (await tempFile.exists()) {
           await tempFile.delete();

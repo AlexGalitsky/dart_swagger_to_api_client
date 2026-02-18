@@ -81,7 +81,19 @@ class EndpointMethodGenerator {
             .toList(growable: false);
 
         // All path params must be required and have a supported primitive type.
-        if (pathParams.any((p) => !p.required || p.dartType == null)) continue;
+        // Additionally, if the path contains placeholders (`{id}`) but we have
+        // no matching path parameters (e.g. missing schema), we skip the endpoint.
+        final hasPathPlaceholders = rawPath.contains('{');
+        if (hasPathPlaceholders) {
+          if (pathParams.isEmpty ||
+              pathParams.any((p) => !p.required || p.dartType == null)) {
+            continue;
+          }
+        } else {
+          if (pathParams.any((p) => !p.required || p.dartType == null)) {
+            continue;
+          }
+        }
 
         // For v1.1.1 we support primitive, array, and object query params.
         // Skip only if we can't determine the type at all.
@@ -491,7 +503,7 @@ class EndpointMethodGenerator {
           '    if (response.statusCode == 401 || response.statusCode == 403) {',
         );
         buffer.writeln(
-          "      throw ApiAuthException('Unauthorized request to \$ _rawPath',",
+          "      throw ApiAuthException('Unauthorized request to \$_rawPath',",
         );
         buffer.writeln(
           '          statusCode: response.statusCode);',
@@ -501,7 +513,7 @@ class EndpointMethodGenerator {
           '    if (response.statusCode >= 500) {',
         );
         buffer.writeln(
-          "      throw ApiServerException('Server error on \$ _rawPath',",
+          "      throw ApiServerException('Server error on \$_rawPath',",
         );
         buffer.writeln(
           '          statusCode: response.statusCode);',
@@ -511,7 +523,7 @@ class EndpointMethodGenerator {
           '    if (response.statusCode < 200 || response.statusCode >= 300) {',
         );
         buffer.writeln(
-          "      throw ApiClientException('Request failed for \$ _rawPath',",
+          "      throw ApiClientException('Request failed for \$_rawPath',",
         );
         buffer.writeln(
           '          statusCode: response.statusCode);',
@@ -951,7 +963,7 @@ class EndpointMethodGenerator {
     if (requestBody is! Map) return null;
 
     final content = requestBody['content'];
-    if (content is! Map && content.isNotEmpty) {
+    if (content is Map && content.isNotEmpty) {
       // Only resolve model types for JSON, not for form-urlencoded
       final jsonContent = content['application/json'];
       if (jsonContent is Map) {

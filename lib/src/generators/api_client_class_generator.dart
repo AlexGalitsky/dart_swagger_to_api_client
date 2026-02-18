@@ -104,16 +104,10 @@ class ApiClient {
       ..._config.defaultHeaders,
       ...additionalHeaders,
     };
-    return ApiClient(
-      ApiClientConfig(
-        baseUrl: _config.baseUrl,
-        defaultHeaders: mergedHeaders,
-        timeout: _config.timeout,
-        auth: _config.auth,
-        httpClientAdapter: _config.httpClientAdapter,
-        httpClient: _config.httpClient,
-      ),
+    final newConfig = _config.copyWith(
+      defaultHeaders: mergedHeaders,
     );
+    return ApiClient(newConfig);
   }
 }
 

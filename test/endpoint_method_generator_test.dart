@@ -1,4 +1,5 @@
 import 'package:dart_swagger_to_api_client/src/generators/endpoint_method_generator.dart';
+import 'package:dart_swagger_to_api_client/src/models/models_resolver.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -155,6 +156,58 @@ void main() {
       expect(code, contains("method: 'POST'"));
       expect(code, contains('final bodyJson = jsonEncode(body);'));
       expect(code, contains('body: bodyJson,'));
+    });
+
+    test('uses model type for requestBody when schema has \$ref', () async {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/users': {
+            'post': {
+              'operationId': 'createUser',
+              'requestBody': {
+                'required': true,
+                'content': {
+                  'application/json': {
+                    'schema': {
+                      '\$ref': '#/components/schemas/User',
+                    },
+                  },
+                },
+              },
+              'responses': {
+                '201': {
+                  'description': 'Created',
+                  'content': {
+                    'application/json': {
+                      'schema': {
+                        '\$ref': '#/components/schemas/User',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        'components': {
+          'schemas': {
+            'User': {
+              'type': 'object',
+            },
+          },
+        },
+      };
+
+      final generatorWithModels = EndpointMethodGenerator(
+        modelsResolver: _FakeModelsResolver(),
+      );
+
+      final result = await generatorWithModels.generateDefaultApiMethods(spec);
+      final code = result.methods;
+
+      expect(code, contains('Future<User> createUser({'));
+      expect(code, contains('required User body'));
+      expect(code, contains('final bodyJson = jsonEncode(body.toJson());'));
     });
 
     test('generates PUT method with requestBody and path params', () async {
@@ -438,3 +491,20 @@ void main() {
   });
 }
 
+class _FakeModelsResolver implements ModelsResolver {
+  const _FakeModelsResolver();
+
+  @override
+  Future<String?> resolveRefToType(String ref) async {
+    if (ref.endsWith('/User')) {
+      return 'User';
+    }
+    return null;
+  }
+
+  @override
+  Future<String?> getImportPath(String typeName) async => null;
+
+  @override
+  Future<bool> isModelType(String typeName) async => typeName == 'User';
+}

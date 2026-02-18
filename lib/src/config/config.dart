@@ -216,6 +216,34 @@ class ApiClientConfig {
           responseInterceptors ?? const [],
         );
 
+  /// Creates a copy of this configuration with some fields replaced.
+  ApiClientConfig copyWith({
+    Uri? baseUrl,
+    Map<String, String>? defaultHeaders,
+    Duration? timeout,
+    AuthConfig? auth,
+    HttpClientAdapter? httpClientAdapter,
+    http.Client? httpClient,
+    List<RequestInterceptor>? requestInterceptors,
+    List<ResponseInterceptor>? responseInterceptors,
+  }) {
+    final effectiveRequestInterceptors =
+        requestInterceptors ?? this.requestInterceptors;
+    final effectiveResponseInterceptors =
+        responseInterceptors ?? this.responseInterceptors;
+
+    return ApiClientConfig(
+      baseUrl: baseUrl ?? this.baseUrl,
+      defaultHeaders: defaultHeaders ?? this.defaultHeaders,
+      timeout: timeout ?? this.timeout,
+      auth: auth ?? this.auth,
+      httpClientAdapter: httpClientAdapter ?? this.httpClientAdapter,
+      httpClient: httpClient ?? this.httpClient,
+      requestInterceptors: effectiveRequestInterceptors,
+      responseInterceptors: effectiveResponseInterceptors,
+    );
+  }
+
   /// Wraps the adapter with middleware if interceptors are provided.
   static HttpClientAdapter _wrapWithMiddleware(
     HttpClientAdapter adapter,

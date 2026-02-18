@@ -285,14 +285,13 @@ void main() {
       await specFile.writeAsString(jsonEncode(spec));
       await outputDir.create(recursive: true);
 
-      // Should not throw even if 3.1.0 has features we don't fully support yet
-      await expectLater(
-        () => ApiClientGenerator.generateClient(
-          inputSpecPath: specFile.path,
-          outputDir: outputDir.path,
-          projectDir: tempDir.path,
-        ),
-        returnsNormally,
+      // Should not throw even if 3.1.0 has features we don't fully support yet.
+      // We await the Future directly so that any GenerationException is properly
+      // attributed to this test and does not surface after completion.
+      await ApiClientGenerator.generateClient(
+        inputSpecPath: specFile.path,
+        outputDir: outputDir.path,
+        projectDir: tempDir.path,
       );
     });
   });

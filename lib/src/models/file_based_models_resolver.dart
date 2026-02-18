@@ -32,24 +32,26 @@ class FileBasedModelsResolver implements ModelsResolver {
   final Set<String> _modelTypes = {};
 
   bool _initialized = false;
-  bool _initializing = false;
+  Future<void>? _initFuture;
 
   /// Initializes the resolver by scanning the models directory.
   ///
   /// Uses lazy initialization - only scans when first needed.
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
-    
-    // Prevent concurrent initialization
-    if (_initializing) {
-      // Wait for ongoing initialization
-      while (_initializing) {
-        await Future.delayed(const Duration(milliseconds: 10));
-      }
+
+    // If initialization is already in progress, wait for it.
+    if (_initFuture != null) {
+      await _initFuture;
       return;
     }
-    
-    _initializing = true;
+
+    // Start initialization and cache the future so other callers can await it.
+    _initFuture = _initialize();
+    await _initFuture;
+  }
+
+  Future<void> _initialize() async {
 
     final outputDir = _modelsConfig?.outputDir ?? 'lib/models';
     final effectiveOutputDir = p.isAbsolute(outputDir)
@@ -62,7 +64,7 @@ class FileBasedModelsResolver implements ModelsResolver {
       return;
     }
 
-    // Scan for model files
+    // Scan for model files (non-recursive by default to keep behaviour predictable)
     await for (final entity in modelsDirectory.list(recursive: false)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
 
@@ -113,7 +115,6 @@ class FileBasedModelsResolver implements ModelsResolver {
     }
 
     _initialized = true;
-    _initializing = false;
   }
 
   /// Pattern to match class definitions: `class ClassName {`
