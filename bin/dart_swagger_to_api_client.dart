@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:dart_swagger_to_api_client/dart_swagger_to_api_client.dart';
-import 'package:dart_swagger_to_api_client/src/config/config_loader.dart';
 
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()

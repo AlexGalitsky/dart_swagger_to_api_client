@@ -32,6 +32,7 @@ class RateLimitInterceptor implements RequestInterceptor {
     required this.window,
   });
 
+  @override
   Future<HttpRequest> onRequest(HttpRequest request) async {
     // Wait for lock
     await _lock.future;

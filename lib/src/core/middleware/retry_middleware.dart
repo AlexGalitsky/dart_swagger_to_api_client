@@ -55,6 +55,7 @@ class RetryInterceptor implements ResponseInterceptor {
   })  : retryableStatusCodes = retryableStatusCodes ?? {500, 502, 503, 504},
         retryableErrors = retryableErrors ?? {TimeoutException};
 
+  @override
   Future<HttpResponse> onResponse(HttpResponse response) async {
     // Check if status code is retryable
     if (retryableStatusCodes.contains(response.statusCode) && _attempt < maxRetries) {

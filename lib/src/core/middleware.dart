@@ -167,7 +167,7 @@ class MiddlewareHttpClientAdapter implements HttpClientAdapter {
         }
         
         // Not retryable, rethrow
-        throw error;
+        rethrow;
       }
     }
 

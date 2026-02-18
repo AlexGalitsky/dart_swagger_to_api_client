@@ -508,9 +508,7 @@ class EndpointMethodGenerator {
               // Map type - serialize directly
               buffer.writeln('    final bodyJson = jsonEncode(body);');
             }
-            if (bodyExpression == null) {
-              bodyExpression = 'bodyJson';
-            }
+            bodyExpression ??= 'bodyJson';
             // Set Content-Type header
             buffer.writeln("    headers['Content-Type'] = '$contentType';");
           }
@@ -1495,9 +1493,7 @@ class _ResponseTypeInfo {
   final bool isList; // true if response is List<ModelType>
   final List<_ResponseHeaderInfo> headers; // Response headers from spec
 
-  static const voidResponse = _ResponseTypeInfo(kind: _ResponseKind.voidResponse);
   static const mapResponse = _ResponseTypeInfo(kind: _ResponseKind.mapResponse);
-  static const listOfMapsResponse = _ResponseTypeInfo(kind: _ResponseKind.listOfMapsResponse, isList: true);
 
   /// Returns true if response has headers defined in spec.
   bool get hasHeaders => headers.isNotEmpty;

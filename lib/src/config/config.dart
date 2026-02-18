@@ -1,13 +1,11 @@
-/// High-level configuration for generated API clients.
-///
-/// This layer is intentionally small and stable: it is used both by the
-/// code generator and by the generated clients at runtime.
+// High-level configuration for generated API clients.
+//
+// This layer is intentionally small and stable: it is used both by the
+// code generator and by the generated clients at runtime.
 
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
-import 'package:meta/meta.dart';
-
 import '../core/http_client_adapter.dart';
 import '../core/middleware.dart';
 
@@ -162,7 +160,6 @@ class AuthConfig {
   /// Gets environment variable value.
   ///
   /// This is a separate method to allow for easier testing.
-  @visibleForTesting
   static String? _getEnv(String name) {
     return Platform.environment[name];
   }

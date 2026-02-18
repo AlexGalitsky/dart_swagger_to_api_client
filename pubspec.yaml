@@ -1,7 +1,21 @@
 name: dart_swagger_to_api_client
-description: A starting point for Dart libraries or applications.
+description: Generate type-safe HTTP API clients from OpenAPI/Swagger specs for Dart and Flutter.
 version: 1.0.0
-# repository: https://github.com/my_org/my_repo
+
+homepage: https://github.com/AlexGalitsky/dart_swagger_to_api_client
+repository: https://github.com/AlexGalitsky/dart_swagger_to_api_client
+issue_tracker: https://github.com/AlexGalitsky/dart_swagger_to_api_client/issues
+
+screenshots:
+  - description: 'Dart - Swagger to API client logo.'
+    path: images/logo.png
+
+topics:
+  - openapi
+  - swagger
+  - code-generator
+  - codegen
+  - http-client
 
 environment:
   sdk: ^3.11.0
@@ -18,3 +32,4 @@ dependencies:
 dev_dependencies:
   lints: ^6.0.0
   test: ^1.25.6
+  coverage: ^1.9.0
