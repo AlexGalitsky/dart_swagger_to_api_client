@@ -77,8 +77,9 @@ class EndpointMethodGenerator {
         // All path params must be required and have a supported primitive type.
         if (pathParams.any((p) => !p.required || p.dartType == null)) continue;
 
-        // For v0.1 we only support primitive query params as well.
-        if (queryParams.any((p) => p.dartType == null)) continue;
+        // For v1.1.1 we support primitive, array, and object query params.
+        // Skip only if we can't determine the type at all.
+        if (queryParams.any((p) => p.dartType == null && !p.isArray && !p.isObject)) continue;
 
         // Header and cookie params must have supported primitive types.
         if (headerParams.any((p) => p.dartType == null)) continue;
@@ -141,38 +142,146 @@ class EndpointMethodGenerator {
         buffer.writeln('    final _path = $pathExpression;');
         buffer.writeln();
 
-        if (queryParams.isNotEmpty) {
-          buffer.writeln(
-            '    final queryParameters = <String, String>{};',
-          );
-          for (final p in queryParams) {
-            final name = p.name;
-            final paramName = p.dartName;
-            if (p.required) {
-              buffer.writeln(
-                "    queryParameters['$name'] = $paramName.toString();",
-              );
-            } else {
-              buffer.writeln(
-                "    if ($paramName != null) {"
-                " queryParameters['$name'] = $paramName.toString(); }",
-              );
+        // Check if we need to handle arrays with explode (multiple query params with same name)
+        final hasExplodedArrays = queryParams.any((p) => p.isArray && p.explode && p.style == 'form');
+        
+        if (queryParams.isNotEmpty || hasExplodedArrays) {
+          if (hasExplodedArrays) {
+            // Use queryParametersAll for arrays with explode
+            buffer.writeln(
+              '    final queryParametersAll = <String, List<String>>{};',
+            );
+            buffer.writeln(
+              '    final queryParameters = <String, String>{};',
+            );
+            
+            for (final p in queryParams) {
+              final name = p.name;
+              final paramName = p.dartName;
+              
+              if (p.isArray) {
+                if (p.explode && p.style == 'form') {
+                  // form + explode: need to add multiple values
+                  if (p.required) {
+                    buffer.writeln('    if ($paramName.isNotEmpty) {');
+                  } else {
+                    buffer.writeln("    if ($paramName != null && $paramName.isNotEmpty) {");
+                  }
+                  buffer.writeln(
+                    "      queryParametersAll['$name'] = $paramName.map((e) => e.toString()).toList();",
+                  );
+                  buffer.writeln('    }');
+                } else {
+                  // Other array styles: single value
+                  if (p.required) {
+                    buffer.writeln('    if ($paramName.isNotEmpty) {');
+                  } else {
+                    buffer.writeln("    if ($paramName != null && $paramName.isNotEmpty) {");
+                  }
+                  buffer.writeln(_generateArraySerialization(p, paramName, name));
+                  buffer.writeln('    }');
+                }
+              } else if (p.isObject) {
+                // Handle object parameters
+                if (p.required) {
+                  buffer.writeln('    {');
+                } else {
+                  buffer.writeln("    if ($paramName != null) {");
+                }
+                buffer.writeln(_generateObjectSerialization(p, paramName, name));
+                buffer.writeln('    }');
+              } else {
+                // Handle primitive parameters
+                if (p.required) {
+                  buffer.writeln(
+                    "    queryParameters['$name'] = $paramName.toString();",
+                  );
+                } else {
+                  buffer.writeln(
+                    "    if ($paramName != null) {"
+                    " queryParameters['$name'] = $paramName.toString(); }",
+                  );
+                }
+              }
             }
+            
+            buffer.writeln('    final auth = _config.auth;');
+            buffer.writeln(
+              '    if (auth?.apiKeyQuery != null && auth?.apiKey != null) {',
+            );
+            buffer.writeln(
+              '      queryParametersAll[auth!.apiKeyQuery!] = [auth.apiKey!];',
+            );
+            buffer.writeln('    }');
+            
+            // Build URI with queryParametersAll
+            buffer.writeln('    final uriBuilder = _config.baseUrl.replace(path: _path);');
+            buffer.writeln('    final allQueryParams = <String, List<String>>{};');
+            buffer.writeln('    queryParametersAll.forEach((key, values) {');
+            buffer.writeln('      allQueryParams[key] = values;');
+            buffer.writeln('    });');
+            buffer.writeln('    queryParameters.forEach((key, value) {');
+            buffer.writeln('      allQueryParams[key] = [value];');
+            buffer.writeln('    });');
+            buffer.writeln('    final uri = uriBuilder.replace(');
+            buffer.writeln('      queryParametersAll: allQueryParams.isEmpty ? null : allQueryParams,');
+            buffer.writeln('    );');
+          } else {
+            // Standard case: no exploded arrays
+            buffer.writeln(
+              '    final queryParameters = <String, String>{};',
+            );
+            for (final p in queryParams) {
+              final name = p.name;
+              final paramName = p.dartName;
+              
+              if (p.isArray) {
+                // Handle array parameters
+                if (p.required) {
+                  buffer.writeln('    if ($paramName.isNotEmpty) {');
+                } else {
+                  buffer.writeln("    if ($paramName != null && $paramName.isNotEmpty) {");
+                }
+                buffer.writeln(_generateArraySerialization(p, paramName, name));
+                buffer.writeln('    }');
+              } else if (p.isObject) {
+                // Handle object parameters
+                if (p.required) {
+                  buffer.writeln('    {');
+                } else {
+                  buffer.writeln("    if ($paramName != null) {");
+                }
+                buffer.writeln(_generateObjectSerialization(p, paramName, name));
+                buffer.writeln('    }');
+              } else {
+                // Handle primitive parameters
+                if (p.required) {
+                  buffer.writeln(
+                    "    queryParameters['$name'] = $paramName.toString();",
+                  );
+                } else {
+                  buffer.writeln(
+                    "    if ($paramName != null) {"
+                    " queryParameters['$name'] = $paramName.toString(); }",
+                  );
+                }
+              }
+            }
+            buffer.writeln('    final auth = _config.auth;');
+            buffer.writeln(
+              '    if (auth?.apiKeyQuery != null && auth?.apiKey != null) {',
+            );
+            buffer.writeln(
+              '      queryParameters[auth!.apiKeyQuery!] = auth.apiKey!;',
+            );
+            buffer.writeln('    }');
+            buffer.writeln(
+              '    final uri = _config.baseUrl.replace('
+              'path: _path, '
+              'queryParameters: queryParameters.isEmpty ? null : queryParameters,'
+              ');',
+            );
           }
-          buffer.writeln('    final auth = _config.auth;');
-          buffer.writeln(
-            '    if (auth?.apiKeyQuery != null && auth?.apiKey != null) {',
-          );
-          buffer.writeln(
-            '      queryParameters[auth!.apiKeyQuery!] = auth.apiKey!;',
-          );
-          buffer.writeln('    }');
-          buffer.writeln(
-            '    final uri = _config.baseUrl.replace('
-            'path: _path, '
-            'queryParameters: queryParameters.isEmpty ? null : queryParameters,'
-            ');',
-          );
         } else {
           buffer.writeln(
             '    final auth = _config.auth;',
@@ -388,14 +497,40 @@ class EndpointMethodGenerator {
         continue; // Skip unsupported parameter locations
       }
 
-      final schema = rawParam['schema'];
-      String? type;
-      if (schema is Map) {
-        final t = schema['type'];
-        if (t is String) type = t;
+      final schema = rawParam['schema'] as Map<String, dynamic>?;
+      if (schema == null) continue;
+
+      // Extract style and explode (with defaults per OpenAPI spec)
+      String style = rawParam['style'] as String? ?? _getDefaultStyle(location);
+      bool explode = rawParam['explode'] as bool? ?? _getDefaultExplode(style);
+
+      // Check if it's an array
+      final type = schema['type'] as String?;
+      final isArray = type == 'array';
+      
+      // Check if it's an object
+      final isObject = type == 'object' || schema.containsKey('properties');
+
+      String? dartType;
+      String? arrayItemType;
+      
+      if (isArray) {
+        final items = schema['items'] as Map<String, dynamic>?;
+        if (items != null) {
+          final itemType = items['type'] as String?;
+          arrayItemType = _mapOpenApiTypeToDart(itemType);
+          dartType = arrayItemType != null ? 'List<$arrayItemType>' : 'List<dynamic>';
+        } else {
+          dartType = 'List<dynamic>';
+        }
+      } else if (isObject) {
+        // For objects, we'll use Map<String, dynamic> for now
+        // Future versions could use generated model types
+        dartType = 'Map<String, dynamic>';
+      } else {
+        dartType = _mapOpenApiTypeToDart(type);
       }
 
-      final dartType = _mapOpenApiTypeToDart(type);
       // Path parameters are always required, others depend on 'required' field
       final required = rawParam['required'] == true || location == 'path';
 
@@ -406,10 +541,47 @@ class EndpointMethodGenerator {
         location: location,
         required: required,
         dartType: dartType,
+        isArray: isArray,
+        arrayItemType: arrayItemType,
+        isObject: isObject,
+        style: style,
+        explode: explode,
+        schema: schema,
       );
     }
 
     return result;
+  }
+
+  /// Returns default style for a parameter location per OpenAPI spec.
+  String _getDefaultStyle(String location) {
+    switch (location) {
+      case 'path':
+        return 'simple';
+      case 'query':
+        return 'form';
+      case 'header':
+        return 'simple';
+      case 'cookie':
+        return 'form';
+      default:
+        return 'form';
+    }
+  }
+
+  /// Returns default explode value for a style per OpenAPI spec.
+  bool _getDefaultExplode(String style) {
+    switch (style) {
+      case 'form':
+        return true;
+      case 'simple':
+      case 'spaceDelimited':
+      case 'pipeDelimited':
+      case 'deepObject':
+        return false;
+      default:
+        return true;
+    }
   }
 
   String? _mapOpenApiTypeToDart(String? type) {
@@ -423,6 +595,81 @@ class EndpointMethodGenerator {
         return 'bool';
       default:
         return null;
+    }
+  }
+
+  /// Generates code to serialize an array parameter according to OpenAPI style rules.
+  String _generateArraySerialization(_Param param, String paramName, String paramKey) {
+    final style = param.style;
+    final explode = param.explode;
+    
+    if (style == 'form') {
+      if (explode) {
+        // form + explode: handled separately with queryParametersAll
+        // This should not be called for exploded form arrays
+        return "      queryParameters['$paramKey'] = $paramName"
+            ".map((e) => e.toString()).join(',');";
+      } else {
+        // form + no explode: ?id=1,2,3 (comma-separated)
+        return "      queryParameters['$paramKey'] = $paramName"
+            ".map((e) => e.toString()).join(',');";
+      }
+    } else if (style == 'spaceDelimited') {
+      // spaceDelimited: ?id=1 2 3 (space-separated, explode has no effect)
+      return "      queryParameters['$paramKey'] = $paramName"
+          ".map((e) => e.toString()).join(' ');";
+    } else if (style == 'pipeDelimited') {
+      // pipeDelimited: ?id=1|2|3 (pipe-separated, explode has no effect)
+      return "      queryParameters['$paramKey'] = $paramName"
+          ".map((e) => e.toString()).join('|');";
+    } else {
+      // simple style (for path/header, but handle gracefully)
+      if (explode) {
+        // simple + explode: 1,2,3 (comma-separated)
+        return "      queryParameters['$paramKey'] = $paramName"
+            ".map((e) => e.toString()).join(',');";
+      } else {
+        // simple + no explode: 1,2,3 (comma-separated, same as explode)
+        return "      queryParameters['$paramKey'] = $paramName"
+            ".map((e) => e.toString()).join(',');";
+      }
+    }
+  }
+
+  /// Generates code to serialize an object parameter according to OpenAPI style rules.
+  String _generateObjectSerialization(_Param param, String paramName, String paramKey) {
+    final style = param.style;
+    final explode = param.explode;
+    
+    if (style == 'deepObject') {
+      // deepObject: ?user[name]=John&user[age]=30 (always exploded)
+      return "      $paramName.forEach((key, value) {"
+          " queryParameters['$paramKey[\$key]'] = value.toString(); });";
+    } else if (style == 'form') {
+      if (explode) {
+        // form + explode: ?name=John&age=30
+        return "      $paramName.forEach((key, value) {"
+            " queryParameters[key] = value.toString(); });";
+      } else {
+        // form + no explode: ?user=name,John,age,30 (comma-separated)
+        return "      final objParts = <String>[];"
+            " $paramName.forEach((key, value) {"
+            " objParts.addAll([key, value.toString()]); });"
+            " queryParameters['$paramKey'] = objParts.join(',');";
+      }
+    } else {
+      // simple style (for path/header, but handle gracefully)
+      if (explode) {
+        // simple + explode: name=John,age=30 (comma-separated key=value pairs)
+        return "      queryParameters['$paramKey'] = $paramName.entries"
+            ".map((e) => '\${e.key}=\${e.value}').join(',');";
+      } else {
+        // simple + no explode: name,John,age,30 (comma-separated values)
+        return "      final objParts = <String>[];"
+            " $paramName.forEach((key, value) {"
+            " objParts.addAll([key, value.toString()]); });"
+            " queryParameters['$paramKey'] = objParts.join(',');";
+      }
     }
   }
 
@@ -464,7 +711,14 @@ class EndpointMethodGenerator {
       params.add('required ${p.dartType} ${p.dartName}');
     }
     for (final p in queryParams) {
-      final type = p.required ? p.dartType! : '${p.dartType}?';
+      String type;
+      if (p.isArray) {
+        type = p.required ? p.dartType! : '${p.dartType}?';
+      } else if (p.isObject) {
+        type = p.required ? p.dartType! : '${p.dartType}?';
+      } else {
+        type = p.required ? p.dartType! : '${p.dartType}?';
+      }
       final modifier = p.required ? 'required ' : '';
       params.add('$modifier$type ${p.dartName}');
     }
@@ -719,13 +973,25 @@ class _Param {
     required this.location,
     required this.required,
     required this.dartType,
+    this.isArray = false,
+    this.arrayItemType,
+    this.isObject = false,
+    this.style = 'form',
+    this.explode = true,
+    this.schema,
   });
 
   final String name;
   final String dartName;
-  final String location; // 'path' or 'query'
+  final String location; // 'path', 'query', 'header', 'cookie'
   final bool required;
   final String? dartType;
+  final bool isArray;
+  final String? arrayItemType; // Type of array items (e.g., 'String', 'int')
+  final bool isObject;
+  final String style; // 'form', 'spaceDelimited', 'pipeDelimited', 'deepObject'
+  final bool explode;
+  final Map<String, dynamic>? schema; // Full schema for complex types
 }
 
 /// Information about the response type for a generated method.

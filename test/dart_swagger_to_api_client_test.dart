@@ -6,6 +6,7 @@
 /// For integration tests (require internet), run:
 /// dart test --dart-define=ENABLE_INTEGRATION_TESTS=true test/integration_test.dart
 
+import 'advanced_parameters_test.dart' as advanced_parameters_test;
 import 'api_client_facade_integration_test.dart' as facade_integration_test;
 import 'api_client_facade_test.dart' as facade_test;
 import 'api_client_generator_test.dart' as generator_test;
@@ -67,4 +68,7 @@ void main() {
   openapi_versions_test.main();
   config_integration_test.main();
   dart_compatibility_test.main();
+
+  // Advanced parameters support
+  advanced_parameters_test.main();
 }
