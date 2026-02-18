@@ -1,0 +1,65 @@
+name: Regenerate API Client (Scheduled)
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          dart-version: '3.11.0'
+
+      - name: Install dependencies
+        run: |
+          dart pub get
+
+      - name: Check if spec has changed
+        id: check-spec
+        run: |
+          # Download latest spec from remote (if using remote spec)
+          # curl -o swagger/api.yaml https://api.example.com/openapi.yaml
+          
+          # Or check if local spec has changed
+          if git diff --quiet HEAD~1 HEAD -- swagger/api.yaml; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate models
+        if: steps.check-spec.outputs.has_changes == 'true'
+        run: |
+          dart run dart_swagger_to_models:dart_swagger_to_models \
+            --input swagger/api.yaml \
+            --output-dir lib/models \
+            --style json_serializable
+
+      - name: Generate API client
+        if: steps.check-spec.outputs.has_changes == 'true'
+        run: |
+          dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
+            --input swagger/api.yaml \
+            --output-dir lib/api_client \
+            --config dart_swagger_to_api_client.yaml
+
+      - name: Commit changes
+        if: steps.check-spec.outputs.has_changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add lib/models lib/api_client
+          git commit -m "chore: regenerate API client and models [skip ci]"
+          git push

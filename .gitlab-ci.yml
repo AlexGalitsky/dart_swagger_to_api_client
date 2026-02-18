@@ -1,0 +1,90 @@
+# GitLab CI configuration for automatic API client regeneration
+#
+# This configuration regenerates the API client when the OpenAPI spec changes.
+# 
+# Usage:
+# 1. Place this file in your project root
+# 2. Ensure your OpenAPI spec is in swagger/api.yaml (or adjust paths)
+# 3. The job will run automatically on push to main/master branches
+
+stages:
+  - regenerate
+
+variables:
+  DART_VERSION: "3.11.0"
+
+# Regenerate API client when spec files change
+regenerate-client:
+  stage: regenerate
+  image: dart:${DART_VERSION}
+  only:
+    changes:
+      - swagger/**/*
+      - openapi/**/*
+      - api/**/*
+      - .gitlab-ci.yml
+  script:
+    - |
+      echo "Installing dependencies..."
+      dart pub get
+      
+      echo "Generating models..."
+      dart run dart_swagger_to_models:dart_swagger_to_models \
+        --input swagger/api.yaml \
+        --output-dir lib/models \
+        --style json_serializable
+      
+      echo "Generating API client..."
+      dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
+        --input swagger/api.yaml \
+        --output-dir lib/api_client \
+        --config dart_swagger_to_api_client.yaml
+      
+      echo "Checking for changes..."
+      if [ -n "$(git status --porcelain)" ]; then
+        echo "Changes detected, committing..."
+        git config user.email "ci@gitlab.com"
+        git config user.name "GitLab CI"
+        git add lib/models lib/api_client
+        git commit -m "chore: regenerate API client and models [skip ci]"
+        git push origin HEAD:${CI_COMMIT_REF_NAME}
+      else
+        echo "No changes detected, skipping commit."
+      fi
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+      when: on_success
+
+# Scheduled regeneration (daily)
+regenerate-client-scheduled:
+  stage: regenerate
+  image: dart:${DART_VERSION}
+  only:
+    - schedules
+  script:
+    - |
+      echo "Scheduled regeneration..."
+      dart pub get
+      
+      # Download latest spec from remote (if using remote spec)
+      # curl -o swagger/api.yaml https://api.example.com/openapi.yaml
+      
+      dart run dart_swagger_to_models:dart_swagger_to_models \
+        --input swagger/api.yaml \
+        --output-dir lib/models \
+        --style json_serializable
+      
+      dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
+        --input swagger/api.yaml \
+        --output-dir lib/api_client \
+        --config dart_swagger_to_api_client.yaml
+      
+      if [ -n "$(git status --porcelain)" ]; then
+        git config user.email "ci@gitlab.com"
+        git config user.name "GitLab CI"
+        git add lib/models lib/api_client
+        git commit -m "chore: regenerate API client and models [skip ci]"
+        git push origin HEAD:${CI_COMMIT_REF_NAME}
+      fi

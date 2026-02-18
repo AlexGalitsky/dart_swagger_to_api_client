@@ -223,7 +223,12 @@ dart_swagger_to_api_client — Дорожная карта
     - ✅ Примеры для BLoC (Events, States, Repository pattern)
     - ✅ Обработка ошибок и состояний загрузки
     - ✅ Примеры использования в Flutter виджетах
-  - ❌ CI‑шаблоны для автоматической регенерации клиента — отложено
+  - ✅ CI‑шаблоны для автоматической регенерации клиента:
+    - ✅ GitHub Actions workflows (push-triggered, scheduled, remote spec)
+    - ✅ GitLab CI configuration
+    - ✅ Автоматическое коммиттинг изменений
+    - ✅ Создание Pull Requests
+    - ✅ Документация по настройке и использованию
 
 ---
 

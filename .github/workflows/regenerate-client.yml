@@ -1,0 +1,85 @@
+name: Regenerate API Client
+
+on:
+  push:
+    paths:
+      - 'swagger/**'
+      - 'openapi/**'
+      - 'api/**'
+      - '.github/workflows/regenerate-client.yml'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force regeneration even if spec unchanged'
+        required: false
+        default: 'false'
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          dart-version: '3.11.0'
+
+      - name: Install dependencies
+        run: |
+          dart pub get
+
+      - name: Generate models
+        run: |
+          dart run dart_swagger_to_models:dart_swagger_to_models \
+            --input swagger/api.yaml \
+            --output-dir lib/models \
+            --style json_serializable
+
+      - name: Generate API client
+        run: |
+          dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
+            --input swagger/api.yaml \
+            --output-dir lib/api_client \
+            --config dart_swagger_to_api_client.yaml
+
+      - name: Check for changes
+        id: check-changes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit changes
+        if: steps.check-changes.outputs.has_changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add lib/models lib/api_client
+          git commit -m "chore: regenerate API client and models [skip ci]"
+          git push
+
+      - name: Create Pull Request
+        if: steps.check-changes.outputs.has_changes == 'true' && github.event_name == 'push'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: regenerate API client and models"
+          title: "Regenerate API Client"
+          body: |
+            This PR was automatically created by the regenerate-client workflow.
+            
+            Changes:
+            - Regenerated API models
+            - Regenerated API client
+            
+            Please review the changes before merging.
+          branch: regenerate-api-client
+          delete-branch: true
