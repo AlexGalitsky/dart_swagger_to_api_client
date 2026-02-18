@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
 
 import '../core/http_client_adapter.dart';
+import '../core/middleware.dart';
 
 /// Authentication options for the generated client.
 ///
@@ -93,6 +94,12 @@ class ApiClientConfig {
   /// single underlying `http.Client` instance across multiple API clients.
   final http.Client? httpClient;
 
+  /// Request interceptors (applied in order before sending requests).
+  final List<RequestInterceptor> requestInterceptors;
+
+  /// Response interceptors (applied in reverse order after receiving responses).
+  final List<ResponseInterceptor> responseInterceptors;
+
   ApiClientConfig({
     required this.baseUrl,
     Map<String, String>? defaultHeaders,
@@ -100,9 +107,32 @@ class ApiClientConfig {
     this.auth,
     HttpClientAdapter? httpClientAdapter,
     this.httpClient,
+    List<RequestInterceptor>? requestInterceptors,
+    List<ResponseInterceptor>? responseInterceptors,
   })  : defaultHeaders = Map.unmodifiable(defaultHeaders ?? const {}),
         timeout = timeout ?? const Duration(seconds: 30),
-        httpClientAdapter =
-            httpClientAdapter ?? HttpHttpClientAdapter(httpClient: httpClient);
+        requestInterceptors = requestInterceptors ?? const [],
+        responseInterceptors = responseInterceptors ?? const [],
+        httpClientAdapter = _wrapWithMiddleware(
+          httpClientAdapter ?? HttpHttpClientAdapter(httpClient: httpClient),
+          requestInterceptors ?? const [],
+          responseInterceptors ?? const [],
+        );
+
+  /// Wraps the adapter with middleware if interceptors are provided.
+  static HttpClientAdapter _wrapWithMiddleware(
+    HttpClientAdapter adapter,
+    List<RequestInterceptor> requestInterceptors,
+    List<ResponseInterceptor> responseInterceptors,
+  ) {
+    if (requestInterceptors.isEmpty && responseInterceptors.isEmpty) {
+      return adapter;
+    }
+    return MiddlewareHttpClientAdapter(
+      adapter,
+      requestInterceptors: requestInterceptors,
+      responseInterceptors: responseInterceptors,
+    );
+  }
 }
 

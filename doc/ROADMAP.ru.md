@@ -202,10 +202,17 @@ dart_swagger_to_api_client — Дорожная карта
   - ❌ Предпросмотр diff перед перезаписью файлов — отложено
   - ❌ Интерактивный режим выбора части endpoints — отложено
 
-- **0.7.0 Middleware и ретраи**
-  - Middleware‑цепочка для запросов/ответов:
-    - логирование, ретраи, rate‑limit обработка.
-  - Подключаемые пользовательские интерсепторы.
+- **0.7.0 Middleware и ретраи** ⚠️ Частично реализовано
+  - ✅ Middleware‑цепочка для запросов/ответов:
+    - ✅ Базовые интерфейсы `RequestInterceptor` и `ResponseInterceptor`
+    - ✅ `MiddlewareHttpClientAdapter` для применения middleware
+    - ✅ Логирование (`LoggingInterceptor`)
+    - ✅ Ретраи с экспоненциальным backoff (`RetryInterceptor`)
+    - ✅ Rate limiting (`RateLimitInterceptor`)
+  - ✅ Подключаемые пользовательские интерсепторы:
+    - ✅ Поддержка кастомных `RequestInterceptor` и `ResponseInterceptor`
+    - ✅ Интеграция в `ApiClientConfig` через `requestInterceptors` и `responseInterceptors`
+  - ❌ Расширенные возможности (circuit breaker, request/response трансформации) — отложено
 
 - **0.8.0 Интеграции**
   - Примеры/генерация кода для интеграции со state management (Riverpod/BLoC) поверх клиента.
