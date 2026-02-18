@@ -558,9 +558,15 @@ on:
 **Проблема: Неподдерживаемый тип контента**
 
 **Решение:** В настоящее время поддерживаются следующие типы контента:
-- `application/json`
-- `application/x-www-form-urlencoded`
-- `multipart/form-data`
+- `application/json` (тело запроса: `Map<String, dynamic>` или модель)
+- `application/x-www-form-urlencoded` (тело запроса: `Map<String, String>`)
+- `multipart/form-data` (тело запроса: `Map<String, dynamic>` с поддержкой File/List<int>)
+- `text/plain` (тело запроса: `String`)
+- `text/html` (тело запроса: `String`)
+- `application/xml` (тело запроса: `String` для простых типов, `Map<String, dynamic>` для сложных)
+- Другие кастомные типы контента (поддерживаются с базовой обработкой)
+
+При наличии нескольких content types в спецификации автоматически выбирается тип с наивысшим приоритетом.
 
 **Проблема: Watch-режим не работает**
 

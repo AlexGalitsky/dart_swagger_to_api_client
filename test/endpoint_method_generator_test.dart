@@ -488,6 +488,219 @@ void main() {
       expect(code, contains("headers['X-Request-ID']"));
       expect(code, contains("headers['Cookie']"));
     });
+
+    test('generates POST method with text/plain content type', () async {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/text': {
+            'post': {
+              'operationId': 'sendText',
+              'requestBody': {
+                'content': {
+                  'text/plain': {
+                    'schema': {
+                      'type': 'string',
+                    },
+                  },
+                },
+              },
+              'responses': {
+                '200': {
+                  'description': 'OK',
+                  'content': {
+                    'application/json': {
+                      'schema': {'type': 'object'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
+
+      expect(code, contains('Future<Map<String, dynamic>> sendText({'));
+      expect(code, contains('required String body'));
+      expect(code, contains("headers['Content-Type'] = 'text/plain'"));
+      expect(code, isNot(contains('jsonEncode')));
+    });
+
+    test('generates POST method with text/html content type', () async {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/html': {
+            'post': {
+              'operationId': 'sendHtml',
+              'requestBody': {
+                'content': {
+                  'text/html': {
+                    'schema': {
+                      'type': 'string',
+                    },
+                  },
+                },
+              },
+              'responses': {
+                '200': {
+                  'description': 'OK',
+                  'content': {
+                    'application/json': {
+                      'schema': {'type': 'object'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
+
+      expect(code, contains('Future<Map<String, dynamic>> sendHtml({'));
+      expect(code, contains('required String body'));
+      expect(code, contains("headers['Content-Type'] = 'text/html'"));
+      expect(code, isNot(contains('jsonEncode')));
+    });
+
+    test('generates POST method with application/xml content type', () async {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/xml': {
+            'post': {
+              'operationId': 'sendXml',
+              'requestBody': {
+                'content': {
+                  'application/xml': {
+                    'schema': {
+                      'type': 'string',
+                    },
+                  },
+                },
+              },
+              'responses': {
+                '200': {
+                  'description': 'OK',
+                  'content': {
+                    'application/json': {
+                      'schema': {'type': 'object'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
+
+      expect(code, contains('Future<Map<String, dynamic>> sendXml({'));
+      expect(code, contains('required String body'));
+      expect(code, contains("headers['Content-Type'] = 'application/xml'"));
+      expect(code, isNot(contains('jsonEncode')));
+    });
+
+    test('generates POST method with multiple content types (selects first by priority)', () async {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/multi': {
+            'post': {
+              'operationId': 'sendMulti',
+              'requestBody': {
+                'content': {
+                  'application/json': {
+                    'schema': {
+                      'type': 'object',
+                    },
+                  },
+                  'text/plain': {
+                    'schema': {
+                      'type': 'string',
+                    },
+                  },
+                  'application/xml': {
+                    'schema': {
+                      'type': 'string',
+                    },
+                  },
+                },
+              },
+              'responses': {
+                '200': {
+                  'description': 'OK',
+                  'content': {
+                    'application/json': {
+                      'schema': {'type': 'object'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
+
+      // Should select multipart/form-data > form-urlencoded > json > text/plain > text/html > xml
+      // Since we have json, text/plain, and xml, json should be selected (third priority)
+      expect(code, contains('Future<Map<String, dynamic>> sendMulti({'));
+      expect(code, contains('required Map<String, dynamic> body'));
+      expect(code, contains("headers['Content-Type'] = 'application/json'"));
+      expect(code, contains('jsonEncode'));
+    });
+
+    test('generates POST method with multiple content types (multipart priority)', () async {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/multi': {
+            'post': {
+              'operationId': 'sendMulti',
+              'requestBody': {
+                'content': {
+                  'application/json': {
+                    'schema': {
+                      'type': 'object',
+                    },
+                  },
+                  'multipart/form-data': {
+                    'schema': {
+                      'type': 'object',
+                    },
+                  },
+                },
+              },
+              'responses': {
+                '200': {
+                  'description': 'OK',
+                  'content': {
+                    'application/json': {
+                      'schema': {'type': 'object'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
+
+      // Should select multipart/form-data (highest priority)
+      expect(code, contains('Future<Map<String, dynamic>> sendMulti({'));
+      expect(code, contains('required Map<String, dynamic> body'));
+      // multipart doesn't set Content-Type header (adapter handles it)
+      expect(code, isNot(contains("headers['Content-Type'] = 'multipart/form-data'")));
+    });
   });
 }
 

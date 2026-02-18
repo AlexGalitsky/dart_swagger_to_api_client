@@ -139,8 +139,9 @@ class EndpointMethodGenerator {
         }
 
         final responseTypeInfo = await _classifyResponse(rawOperation);
-        final requestBodyType = await _getRequestBodyType(rawOperation);
-        final requestBodyContentType = _getRequestBodyContentType(rawOperation);
+        final requestBodyContentInfo = _getRequestBodyContentInfo(rawOperation);
+        final requestBodyType = await _getRequestBodyType(rawOperation, requestBodyContentInfo);
+        final requestBodyContentType = requestBodyContentInfo.defaultContentType;
         
         // Collect imports for model types
         if (responseTypeInfo.modelType != null) {
@@ -165,6 +166,7 @@ class EndpointMethodGenerator {
           responseTypeInfo: responseTypeInfo,
           requestBodyType: requestBodyType,
           requestBodyContentType: requestBodyContentType,
+          requestBodyContentInfo: requestBodyContentInfo,
           hasBody: hasBody,
         );
         final pathExpression = _buildInterpolatedPath(rawPath, pathParams);
@@ -452,14 +454,16 @@ class EndpointMethodGenerator {
         // Serialize body if present
         String? bodyExpression;
         if (hasBody) {
-          if (requestBodyContentType == 'multipart/form-data') {
+          final contentType = requestBodyContentType ?? 'application/json';
+          
+          if (contentType == 'multipart/form-data') {
             // Multipart/form-data: body is Map<String, dynamic> where values can be
             // String, File, or List<int>. The adapter will handle conversion to MultipartRequest.
             // We store the body as-is and let the adapter detect and handle multipart.
             bodyExpression = 'body';
             // Don't set Content-Type header - adapter will set it with boundary for multipart
             // For now, we'll pass the body as Map and adapter will check for File/List<int>
-          } else if (requestBodyContentType == 'application/x-www-form-urlencoded') {
+          } else if (contentType == 'application/x-www-form-urlencoded') {
             // Form-urlencoded: convert Map to query string
             buffer.writeln('    final formData = body.entries');
             buffer.writeln(
@@ -471,17 +475,44 @@ class EndpointMethodGenerator {
             buffer.writeln(
               "    headers['Content-Type'] = 'application/x-www-form-urlencoded';",
             );
+          } else if (contentType == 'text/plain' || contentType == 'text/html') {
+            // Text content types: body is already a String
+            bodyExpression = 'body';
+            buffer.writeln("    headers['Content-Type'] = '$contentType';");
+          } else if (contentType == 'application/xml') {
+            // XML content type: body can be String or Map (serialized to XML string)
+            // For now, we'll treat it as String if it's a String, otherwise serialize
+            // Note: Full XML serialization would require additional dependencies
+            if (requestBodyType == 'String') {
+              bodyExpression = 'body';
+            } else {
+              // For complex types, we'll serialize to JSON for now
+              // In the future, this could be extended to support XML serialization
+              if (requestBodyType != null) {
+                buffer.writeln('    final bodyJson = jsonEncode(body.toJson());');
+              } else {
+                buffer.writeln('    final bodyJson = jsonEncode(body);');
+              }
+              bodyExpression = 'bodyJson';
+            }
+            buffer.writeln("    headers['Content-Type'] = 'application/xml';");
           } else {
-            // JSON content type (default)
-            if (requestBodyType != null) {
+            // JSON content type (default) or other content types
+            if (requestBodyType != null && requestBodyType != 'String') {
               // Model type - serialize using toJson()
               buffer.writeln('    final bodyJson = jsonEncode(body.toJson());');
+            } else if (requestBodyType == 'String') {
+              // String type - use as-is
+              bodyExpression = 'body';
             } else {
               // Map type - serialize directly
               buffer.writeln('    final bodyJson = jsonEncode(body);');
             }
-            bodyExpression = 'bodyJson';
-            buffer.writeln("    headers['Content-Type'] = 'application/json';");
+            if (bodyExpression == null) {
+              bodyExpression = 'bodyJson';
+            }
+            // Set Content-Type header
+            buffer.writeln("    headers['Content-Type'] = '$contentType';");
           }
         }
 
@@ -790,6 +821,7 @@ class EndpointMethodGenerator {
     required _ResponseTypeInfo responseTypeInfo,
     String? requestBodyType,
     String? requestBodyContentType,
+    required _RequestBodyContentInfo requestBodyContentInfo,
     required bool hasBody,
   }) {
     final buffer = StringBuffer();
@@ -822,20 +854,40 @@ class EndpointMethodGenerator {
       params.add('$modifier$type ${p.dartName}');
     }
     if (hasBody) {
-      // For form-urlencoded, use Map<String, String>
-      // For multipart/form-data, use Map<String, dynamic> (can contain String, File, List<int>)
-      // For JSON, use model type or Map<String, dynamic>
-      final bodyType = requestBodyContentType == 'application/x-www-form-urlencoded'
-          ? 'Map<String, String>'
-          : (requestBodyContentType == 'multipart/form-data'
-              ? 'Map<String, dynamic>'
-              : (requestBodyType ?? 'Map<String, dynamic>'));
+      // Determine body type based on content type
+      final bodyType = _getBodyTypeForContentType(
+        requestBodyContentType,
+        requestBodyType,
+      );
       params.add('required $bodyType body');
     }
 
     buffer.write(params.join(', '));
     buffer.write('}) async');
     return buffer.toString();
+  }
+  
+  /// Gets the Dart type for body parameter based on content type.
+  String _getBodyTypeForContentType(String? contentType, String? resolvedType) {
+    if (contentType == null) {
+      return resolvedType ?? 'Map<String, dynamic>';
+    }
+    
+    switch (contentType) {
+      case 'application/x-www-form-urlencoded':
+        return 'Map<String, String>';
+      case 'multipart/form-data':
+        return 'Map<String, dynamic>';
+      case 'text/plain':
+      case 'text/html':
+        return 'String';
+      case 'application/json':
+      case 'application/xml':
+        return resolvedType ?? 'Map<String, dynamic>';
+      default:
+        // For unknown content types, try to use resolved type, fallback to String
+        return resolvedType ?? 'String';
+    }
   }
 
   bool _hasRequestBody(Map<dynamic, dynamic> operation) {
@@ -844,40 +896,103 @@ class EndpointMethodGenerator {
 
     final content = requestBody['content'];
     if (content is Map && content.isNotEmpty) {
-      // Check if there's application/json, application/x-www-form-urlencoded, or multipart/form-data
-      if (content.containsKey('application/json') ||
-          content.containsKey('application/x-www-form-urlencoded') ||
-          content.containsKey('multipart/form-data')) {
-        return true;
+      // Check if there's any supported content type
+      final supportedContentTypes = [
+        'application/json',
+        'application/x-www-form-urlencoded',
+        'multipart/form-data',
+        'text/plain',
+        'text/html',
+        'application/xml',
+      ];
+      
+      // Check for supported content types
+      for (final contentType in supportedContentTypes) {
+        if (content.containsKey(contentType)) {
+          return true;
+        }
       }
+      
+      // Also accept any other content type (for extensibility)
+      // as long as there's at least one content type defined
+      return true;
     }
 
     return false;
   }
 
-  /// Gets the content type for requestBody.
+  /// Gets information about requestBody content types.
   ///
-  /// Returns 'application/json', 'application/x-www-form-urlencoded', 'multipart/form-data',
-  /// or null if not found.
-  String? _getRequestBodyContentType(Map<dynamic, dynamic> operation) {
+  /// Returns information about all available content types and the default one.
+  _RequestBodyContentInfo _getRequestBodyContentInfo(Map<dynamic, dynamic> operation) {
     final requestBody = operation['requestBody'];
-    if (requestBody is! Map) return null;
-
-    final content = requestBody['content'];
-    if (content is Map && content.isNotEmpty) {
-      // Priority: multipart/form-data > application/x-www-form-urlencoded > application/json
-      if (content.containsKey('multipart/form-data')) {
-        return 'multipart/form-data';
-      }
-      if (content.containsKey('application/x-www-form-urlencoded')) {
-        return 'application/x-www-form-urlencoded';
-      }
-      if (content.containsKey('application/json')) {
-        return 'application/json';
-      }
+    if (requestBody is! Map) {
+      return const _RequestBodyContentInfo(
+        availableContentTypes: [],
+        defaultContentType: null,
+      );
     }
 
-    return null;
+    final content = requestBody['content'];
+    if (content is! Map || content.isEmpty) {
+      return const _RequestBodyContentInfo(
+        availableContentTypes: [],
+        defaultContentType: null,
+      );
+    }
+
+    // Collect all available content types
+    final availableContentTypes = <String>[];
+    final contentTypes = content.keys.cast<String>().toList();
+    
+    // Priority order for default selection:
+    // 1. multipart/form-data
+    // 2. application/x-www-form-urlencoded
+    // 3. application/json
+    // 4. text/plain
+    // 5. text/html
+    // 6. application/xml
+    // 7. Others (in order of appearance)
+    final priorityOrder = [
+      'multipart/form-data',
+      'application/x-www-form-urlencoded',
+      'application/json',
+      'text/plain',
+      'text/html',
+      'application/xml',
+    ];
+    
+    // Add prioritized content types first
+    for (final priorityType in priorityOrder) {
+      if (contentTypes.contains(priorityType)) {
+        availableContentTypes.add(priorityType);
+      }
+    }
+    
+    // Add remaining content types
+    for (final contentType in contentTypes) {
+      if (!availableContentTypes.contains(contentType)) {
+        availableContentTypes.add(contentType);
+      }
+    }
+    
+    // Select default content type (first in priority order, or first available)
+    String? defaultContentType;
+    Map<String, dynamic>? defaultContentTypeSchema;
+    
+    if (availableContentTypes.isNotEmpty) {
+      defaultContentType = availableContentTypes.first;
+      final defaultContent = content[defaultContentType];
+      if (defaultContent is Map) {
+        defaultContentTypeSchema = Map<String, dynamic>.from(defaultContent);
+      }
+    }
+    
+    return _RequestBodyContentInfo(
+      availableContentTypes: availableContentTypes,
+      defaultContentType: defaultContentType,
+      defaultContentTypeSchema: defaultContentTypeSchema,
+    );
   }
 
   Future<_ResponseTypeInfo> _classifyResponse(
@@ -957,21 +1072,46 @@ class EndpointMethodGenerator {
 
   /// Gets the Dart type for requestBody, if it can be resolved from $ref.
   ///
-  /// Only works for JSON content types. Form-urlencoded always uses Map&lt;String, String&gt;.
-  Future<String?> _getRequestBodyType(Map<dynamic, dynamic> operation) async {
+  /// Only works for JSON and XML content types. Form-urlencoded always uses Map&lt;String, String&gt;.
+  /// Text content types use String.
+  Future<String?> _getRequestBodyType(
+    Map<dynamic, dynamic> operation,
+    _RequestBodyContentInfo contentInfo,
+  ) async {
+    if (contentInfo.defaultContentType == null) return null;
+    
     final requestBody = operation['requestBody'];
     if (requestBody is! Map) return null;
 
     final content = requestBody['content'];
-    if (content is Map && content.isNotEmpty) {
-      // Only resolve model types for JSON, not for form-urlencoded
-      final jsonContent = content['application/json'];
-      if (jsonContent is Map) {
-        final schema = jsonContent['schema'];
+    if (content is! Map || content.isEmpty) return null;
+    
+    final contentType = contentInfo.defaultContentType!;
+    
+    // For text/plain and text/html, return String type
+    if (contentType == 'text/plain' || contentType == 'text/html') {
+      return 'String';
+    }
+    
+    // For JSON and XML, try to resolve model types
+    if (contentType == 'application/json' || contentType == 'application/xml') {
+      final typeContent = content[contentType];
+      if (typeContent is Map) {
+        final schema = typeContent['schema'];
         if (schema is Map) {
+          // Check for $ref first
           final ref = schema['\$ref'];
           if (ref is String) {
-            return await _modelsResolver.resolveRefToType(ref);
+            final resolvedType = await _modelsResolver.resolveRefToType(ref);
+            if (resolvedType != null) return resolvedType;
+          }
+          
+          // Check for primitive type 'string' in XML
+          if (contentType == 'application/xml') {
+            final type = schema['type'] as String?;
+            if (type == 'string') {
+              return 'String';
+            }
           }
         }
       }
@@ -1275,4 +1415,25 @@ enum _ResponseKind {
   voidResponse,
   mapResponse,
   listOfMapsResponse,
+}
+
+/// Information about requestBody content types.
+class _RequestBodyContentInfo {
+  const _RequestBodyContentInfo({
+    required this.availableContentTypes,
+    required this.defaultContentType,
+    this.defaultContentTypeSchema,
+  });
+
+  /// List of all available content types in priority order.
+  final List<String> availableContentTypes;
+  
+  /// Default content type to use (first available with priority).
+  final String? defaultContentType;
+  
+  /// Schema for the default content type (for type resolution).
+  final Map<String, dynamic>? defaultContentTypeSchema;
+  
+  /// Returns true if multiple content types are available.
+  bool get hasMultipleContentTypes => availableContentTypes.length > 1;
 }

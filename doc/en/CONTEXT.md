@@ -60,7 +60,7 @@ lib/
 4. **`EndpointMethodGenerator`** (`lib/src/generators/endpoint_method_generator.dart`)
    - Parses OpenAPI `paths` and `operations`
    - Generates method signatures with parameters (path, query, header, cookie)
-   - Handles request bodies (JSON, form-urlencoded, multipart)
+   - Handles request bodies (JSON, form-urlencoded, multipart, text/plain, text/html, XML)
    - Classifies response types (void, Map, List, Model)
    - Uses `ModelsResolver` to resolve `$ref` to Dart types
    - Returns: `({String methods, Set<String> imports})`
@@ -177,9 +177,13 @@ class HttpResponse {
   - `header`: Added to request headers
   - `cookie`: Added to Cookie header
 - **Request Body**:
-  - `application/json`: Serialized to JSON string
-  - `application/x-www-form-urlencoded`: Serialized to query string
+  - `application/json`: Serialized to JSON string (type: `Map<String, dynamic>` or model)
+  - `application/x-www-form-urlencoded`: Serialized to query string (type: `Map<String, String>`)
   - `multipart/form-data`: Handled as `Map<String, dynamic>` with File/List<int>
+  - `text/plain`: Passed as string (type: `String`)
+  - `text/html`: Passed as string (type: `String`)
+  - `application/xml`: Passed as string for simple types or serialized for complex (type: `String` or `Map<String, dynamic>`)
+  - Support for multiple content types with automatic priority-based selection
 - **Response Types**:
   - `204 No Content` → `Future<void>`
   - Empty content → `Future<void>`

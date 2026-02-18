@@ -98,12 +98,14 @@
   - [x] Поддержка параметров, определенных на уровне path item
   - [x] Правильное наследование параметров (operation-level переопределяет path-level)
 
-### 1.1.2 Расширенная поддержка requestBody
+### 1.1.2 Расширенная поддержка requestBody ✅ ЗАВЕРШЕНО
 
-- [ ] **Множественные content types (этап 1)**
-  - [ ] Базовая поддержка нескольких content types для одного endpoint
-  - [ ] Поддержка `text/plain`, `text/html`, `application/xml`
-  - [ ] Поддержка кастомных content types
+- [x] **Множественные content types (этап 1)**
+  - [x] Базовая поддержка нескольких content types для одного endpoint
+  - [x] Поддержка `text/plain`, `text/html`, `application/xml`
+  - [x] Поддержка кастомных content types
+  - [x] Приоритетный выбор content type (multipart > form-urlencoded > json > text/plain > text/html > xml > другие)
+  - [x] Правильная генерация типов body для разных content types (String для text, Map для JSON/XML)
 
 - [ ] **Умный выбор content type (этап 2, после v1.1.0)**
   - [ ] Автоматический выбор content type на основе данных/конфигурации

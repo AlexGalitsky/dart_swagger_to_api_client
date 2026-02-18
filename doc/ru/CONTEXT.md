@@ -60,7 +60,7 @@ lib/
 4. **`EndpointMethodGenerator`** (`lib/src/generators/endpoint_method_generator.dart`)
    - Парсит OpenAPI `paths` и `operations`
    - Генерирует сигнатуры методов с параметрами (path, query, header, cookie)
-   - Обрабатывает request bodies (JSON, form-urlencoded, multipart)
+   - Обрабатывает request bodies (JSON, form-urlencoded, multipart, text/plain, text/html, XML)
    - Классифицирует типы ответов (void, Map, List, Model)
    - Использует `ModelsResolver` для разрешения `$ref` в Dart типы
    - Возвращает: `({String methods, Set<String> imports})`
@@ -177,9 +177,13 @@ class HttpResponse {
   - `header`: Добавляются в заголовки запроса
   - `cookie`: Добавляются в заголовок Cookie
 - **Request Body**:
-  - `application/json`: Сериализуется в JSON строку
-  - `application/x-www-form-urlencoded`: Сериализуется в query строку
+  - `application/json`: Сериализуется в JSON строку (тип: `Map<String, dynamic>` или модель)
+  - `application/x-www-form-urlencoded`: Сериализуется в query строку (тип: `Map<String, String>`)
   - `multipart/form-data`: Обрабатывается как `Map<String, dynamic>` с File/List<int>
+  - `text/plain`: Передается как строка (тип: `String`)
+  - `text/html`: Передается как строка (тип: `String`)
+  - `application/xml`: Передается как строка для простых типов или сериализуется для сложных (тип: `String` или `Map<String, dynamic>`)
+  - Поддержка множественных content types с автоматическим выбором по приоритету
 - **Типы ответов**:
   - `204 No Content` → `Future<void>`
   - Пустой content → `Future<void>`

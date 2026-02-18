@@ -558,9 +558,15 @@ See `example/bloc_integration_example.dart` for complete examples:
 **Issue: Unsupported content type**
 
 **Solution:** Currently supported content types:
-- `application/json`
-- `application/x-www-form-urlencoded`
-- `multipart/form-data`
+- `application/json` (request body: `Map<String, dynamic>` or model type)
+- `application/x-www-form-urlencoded` (request body: `Map<String, String>`)
+- `multipart/form-data` (request body: `Map<String, dynamic>` with File/List<int> support)
+- `text/plain` (request body: `String`)
+- `text/html` (request body: `String`)
+- `application/xml` (request body: `String` for simple types, `Map<String, dynamic>` for complex types)
+- Other custom content types (supported with basic handling)
+
+When multiple content types are present in the spec, the type with the highest priority is automatically selected.
 
 **Issue: Watch mode not working**
 
