@@ -217,9 +217,13 @@ dart_swagger_to_api_client — Дорожная карта
     - ✅ Request/response трансформации (`TransformerInterceptor`) — модификация запросов и ответов
     - ✅ Helper классы для общих трансформаций (`RequestTransformers`, `ResponseTransformers`)
 
-- **0.8.0 Интеграции**
-  - Примеры/генерация кода для интеграции со state management (Riverpod/BLoC) поверх клиента.
-  - CI‑шаблоны для автоматической регенерации клиента.
+- **0.8.0 Интеграции** ⚠️ Частично реализовано
+  - ✅ Примеры интеграции со state management:
+    - ✅ Примеры для Riverpod (Provider, FutureProvider, StateNotifier)
+    - ✅ Примеры для BLoC (Events, States, Repository pattern)
+    - ✅ Обработка ошибок и состояний загрузки
+    - ✅ Примеры использования в Flutter виджетах
+  - ❌ CI‑шаблоны для автоматической регенерации клиента — отложено
 
 ---
 

@@ -266,6 +266,28 @@ dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
 
 Для остановки watch-режима нажмите `Ctrl+C`.
 
+### Интеграция со state management
+
+Пакет можно интегрировать с популярными решениями для управления состоянием в Flutter.
+
+#### Riverpod
+
+Примеры интеграции с Riverpod доступны в `example/riverpod_integration_example.dart`:
+
+- Простые `Provider` и `FutureProvider` для работы с API
+- `StateNotifier` для сложной логики управления состоянием
+- Обработка ошибок и состояний загрузки
+- Автоматическое обновление UI при изменении данных
+
+#### BLoC
+
+Примеры интеграции с BLoC доступны в `example/bloc_integration_example.dart`:
+
+- Создание событий и состояний для API операций
+- Обработка различных типов ошибок (auth, server, timeout)
+- Паттерн Repository для разделения бизнес-логики
+- Использование `BlocBuilder` и `BlocListener` в виджетах
+
 ## v0.1 Smoke test (в этом репозитории)
 
 В репозитории есть минимальная OpenAPI‑спека для теста:
