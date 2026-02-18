@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:yaml/yaml.dart';
 
 import 'config.dart';
+import 'config_validator.dart';
+import '../core/errors.dart';
 
 /// Configuration loaded from `dart_swagger_to_api_client.yaml`.
 ///
@@ -145,7 +147,7 @@ class ConfigLoader {
       customAdapterType = readString(httpNode, 'customAdapterType');
     }
 
-    return ApiGeneratorConfig(
+    final config = ApiGeneratorConfig(
       input: input,
       outputDir: outputDir,
       baseUrl: baseUrl,
@@ -155,6 +157,21 @@ class ConfigLoader {
       customAdapterType: customAdapterType,
       environments: environments,
     );
+
+    // Validate configuration
+    try {
+      ConfigValidator.validate(config);
+    } catch (e) {
+      if (e is ConfigValidationException) {
+        rethrow;
+      }
+      throw ConfigValidationException(
+        'Failed to validate configuration: $e',
+        cause: e,
+      );
+    }
+
+    return config;
   }
 
   /// Loads an environment profile from a YAML node.

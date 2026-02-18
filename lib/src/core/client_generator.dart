@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../config/config.dart';
+import 'errors.dart';
+import 'spec_cache.dart';
 import '../generators/api_client_class_generator.dart';
 import '../generators/endpoint_method_generator.dart';
 import '../models/file_based_models_resolver.dart';
@@ -25,6 +27,7 @@ class ApiClientGenerator {
   /// - [projectDir]: project root, to resolve relative paths if needed
   /// - [onWarning]: optional callback for warning messages (useful for CLI output)
   /// - [customAdapterType]: optional custom adapter type name (for custom adapters)
+  /// - [enableCache]: whether to enable spec parsing cache (default: true)
   static Future<void> generateClient({
     required String inputSpecPath,
     required String outputDir,
@@ -32,9 +35,48 @@ class ApiClientGenerator {
     String? projectDir,
     void Function(String message)? onWarning,
     String? customAdapterType,
+    bool enableCache = true,
   }) async {
-    // 1. Load spec (YAML/JSON → Map<String, dynamic>).
-    final spec = await SpecLoader.load(inputSpecPath);
+    try {
+      // 0. Validate configuration if provided
+      if (config != null) {
+        try {
+          // Note: ApiClientConfig validation would go here if we add it
+          // For now, we validate generator config in ConfigLoader
+        } catch (e) {
+          throw GenerationException(
+            'Invalid client configuration',
+            context: {'error': e.toString()},
+            cause: e,
+          );
+        }
+      }
+
+      // 1. Load spec (YAML/JSON → Map<String, dynamic>) with optional caching.
+      final cacheDir = projectDir != null
+          ? p.join(projectDir, '.dart_tool', 'dart_swagger_to_api_client')
+          : p.join(Directory.current.path, '.dart_tool', 'dart_swagger_to_api_client');
+      
+      final cache = enableCache ? SpecCache(cacheDir: cacheDir) : null;
+      final loader = SpecLoader(cache: cache);
+      
+      Map<String, dynamic> spec;
+      try {
+        spec = await loader.load(inputSpecPath);
+      } catch (e) {
+        if (e is GenerationException) {
+          rethrow;
+        }
+        throw GenerationException(
+          'Failed to load OpenAPI specification',
+          path: inputSpecPath,
+          context: {
+            'inputPath': inputSpecPath,
+            'absolutePath': File(inputSpecPath).absolute.path,
+          },
+          cause: e,
+        );
+      }
 
     // 2. Validate spec and collect issues.
     final issues = SpecValidator.validate(spec);
@@ -50,9 +92,15 @@ class ApiClientGenerator {
 
     // If there are errors, throw with detailed message.
     if (errors.isNotEmpty) {
-      final errorMessages = errors.map((e) => e.toString()).join('\n');
-      throw StateError(
-        'Spec validation failed:\n$errorMessages',
+      throw GenerationException(
+        'OpenAPI specification validation failed',
+        path: inputSpecPath,
+        context: {
+          'errorCount': errors.length,
+          'warningCount': warnings.length,
+          'errors': errors.map((e) => e.message).toList(),
+          'errorDetails': errors.map((e) => e.toString()).toList(),
+        },
       );
     }
 
@@ -96,11 +144,34 @@ class ApiClientGenerator {
 
     final outputPath = p.join(outputDir, 'api_client.dart');
     final outputFile = File(outputPath);
-    await outputFile.writeAsString(clientSource);
-
-    // `config` and `projectDir` are intentionally unused for v0.1 but are
-    // part of the API so that CLI and examples can already depend on the
-    // stable signature.
+    
+    try {
+      await outputFile.writeAsString(clientSource);
+    } catch (e) {
+      throw GenerationException(
+        'Failed to write generated client code',
+        path: outputPath,
+        context: {
+          'outputDir': outputDir,
+          'outputPath': outputPath,
+          'fileSize': clientSource.length,
+        },
+        cause: e,
+      );
+    }
+    } catch (e) {
+      if (e is GenerationException || e is ConfigValidationException) {
+        rethrow;
+      }
+      throw GenerationException(
+        'Unexpected error during client generation',
+        context: {
+          'inputPath': inputSpecPath,
+          'outputDir': outputDir,
+        },
+        cause: e,
+      );
+    }
   }
 }
 

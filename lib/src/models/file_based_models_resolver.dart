@@ -32,10 +32,24 @@ class FileBasedModelsResolver implements ModelsResolver {
   final Set<String> _modelTypes = {};
 
   bool _initialized = false;
+  bool _initializing = false;
 
   /// Initializes the resolver by scanning the models directory.
+  ///
+  /// Uses lazy initialization - only scans when first needed.
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
+    
+    // Prevent concurrent initialization
+    if (_initializing) {
+      // Wait for ongoing initialization
+      while (_initializing) {
+        await Future.delayed(const Duration(milliseconds: 10));
+      }
+      return;
+    }
+    
+    _initializing = true;
 
     final outputDir = _modelsConfig?.outputDir ?? 'lib/models';
     final effectiveOutputDir = p.isAbsolute(outputDir)
@@ -99,6 +113,7 @@ class FileBasedModelsResolver implements ModelsResolver {
     }
 
     _initialized = true;
+    _initializing = false;
   }
 
   /// Pattern to match class definitions: `class ClassName {`

@@ -171,6 +171,7 @@ Future<void> main(List<String> arguments) async {
                 ? (msg) => stdout.writeln(msg)
                 : null), // In non-verbose mode, warnings are suppressed
         customAdapterType: customAdapterType,
+        enableCache: true,
       );
 
       if (verbose) {
@@ -179,9 +180,19 @@ Future<void> main(List<String> arguments) async {
         stdout.writeln('✓ Client regenerated');
       }
     } catch (e, stackTrace) {
-      stderr.writeln('Generation failed: $e');
-      if (verbose) {
-        stderr.writeln(stackTrace);
+      if (e is GenerationException || e is ConfigValidationException) {
+        stderr.writeln('Error: $e');
+        if (verbose) {
+          // In verbose mode, also print stack trace
+          stderr.writeln('\nStack trace:');
+          stderr.writeln(stackTrace);
+        }
+      } else {
+        stderr.writeln('Error: $e');
+        if (verbose) {
+          stderr.writeln('\nStack trace:');
+          stderr.writeln(stackTrace);
+        }
       }
       exitCode = 1;
     }

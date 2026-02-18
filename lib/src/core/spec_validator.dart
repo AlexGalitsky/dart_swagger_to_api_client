@@ -9,6 +9,50 @@ class SpecValidator {
   static List<SpecIssue> validate(Map<String, dynamic> spec) {
     final issues = <SpecIssue>[];
 
+    // Check OpenAPI version and compatibility
+    final openApiVersion = spec['openapi'] as String?;
+    final swaggerVersion = spec['swagger'] as String?;
+    
+    if (openApiVersion != null) {
+      final version = _parseVersion(openApiVersion);
+      if (version != null) {
+        if (version.major == 3) {
+          if (version.minor > 1) {
+            issues.add(SpecIssue(
+              severity: IssueSeverity.warning,
+              message: 'OpenAPI $openApiVersion may not be fully supported. '
+                  'This package is tested with OpenAPI 3.0.0 and 3.1.0.',
+              path: '/openapi',
+            ));
+          }
+        } else if (version.major < 3) {
+          issues.add(SpecIssue(
+            severity: IssueSeverity.warning,
+            message: 'OpenAPI $openApiVersion is deprecated. '
+                'Consider upgrading to OpenAPI 3.0.0 or later.',
+            path: '/openapi',
+          ));
+        }
+      }
+    } else if (swaggerVersion != null) {
+      final version = _parseVersion(swaggerVersion);
+      if (version != null && version.major == 2) {
+        issues.add(SpecIssue(
+          severity: IssueSeverity.warning,
+          message: 'Swagger 2.0 is supported but deprecated. '
+              'Consider migrating to OpenAPI 3.0.0 or later.',
+          path: '/swagger',
+        ));
+      }
+    } else {
+      issues.add(SpecIssue(
+        severity: IssueSeverity.warning,
+        message: 'Spec does not declare OpenAPI or Swagger version. '
+            'Assuming OpenAPI 3.0.0 compatibility.',
+        path: '/',
+      ));
+    }
+
     // Check for required top-level keys
     if (!spec.containsKey('paths') || spec['paths'] is! Map) {
       issues.add(SpecIssue(
@@ -27,6 +71,9 @@ class SpecValidator {
         path: '/paths',
       ));
     }
+
+    // Check for deprecated features
+    _checkDeprecatedFeatures(spec, issues);
 
     // Validate each path
     paths.forEach((pathKey, pathItem) {
@@ -114,6 +161,87 @@ class SpecValidator {
 
     return issues;
   }
+
+  /// Checks for deprecated OpenAPI features.
+  static void _checkDeprecatedFeatures(
+    Map<String, dynamic> spec,
+    List<SpecIssue> issues,
+  ) {
+    // Check for deprecated 'consumes' and 'produces' (Swagger 2.0)
+    if (spec.containsKey('consumes')) {
+      issues.add(SpecIssue(
+        severity: IssueSeverity.warning,
+        message: 'Top-level "consumes" is deprecated in OpenAPI 3.0. '
+            'Use "requestBody.content" instead.',
+        path: '/consumes',
+      ));
+    }
+
+    if (spec.containsKey('produces')) {
+      issues.add(SpecIssue(
+        severity: IssueSeverity.warning,
+        message: 'Top-level "produces" is deprecated in OpenAPI 3.0. '
+            'Use "responses.*.content" instead.',
+        path: '/produces',
+      ));
+    }
+
+    // Check for deprecated 'host', 'basePath', 'schemes' (Swagger 2.0)
+    if (spec.containsKey('host')) {
+      issues.add(SpecIssue(
+        severity: IssueSeverity.warning,
+        message: 'Top-level "host" is deprecated in OpenAPI 3.0. '
+            'Use "servers" array instead.',
+        path: '/host',
+      ));
+    }
+
+    if (spec.containsKey('basePath')) {
+      issues.add(SpecIssue(
+        severity: IssueSeverity.warning,
+        message: 'Top-level "basePath" is deprecated in OpenAPI 3.0. '
+            'Use "servers" array instead.',
+        path: '/basePath',
+      ));
+    }
+
+    if (spec.containsKey('schemes')) {
+      issues.add(SpecIssue(
+        severity: IssueSeverity.warning,
+        message: 'Top-level "schemes" is deprecated in OpenAPI 3.0. '
+            'Use "servers" array instead.',
+        path: '/schemes',
+      ));
+    }
+  }
+
+  /// Parses a version string (e.g., "3.0.0") into a Version object.
+  static _Version? _parseVersion(String versionString) {
+    try {
+      final parts = versionString.split('.');
+      if (parts.length >= 2) {
+        final major = int.parse(parts[0]);
+        final minor = int.parse(parts[1]);
+        final patch = parts.length > 2 ? int.tryParse(parts[2]) ?? 0 : 0;
+        return _Version(major, minor, patch);
+      }
+    } catch (_) {
+      // Invalid version format
+    }
+    return null;
+  }
+}
+
+/// Represents a version number.
+class _Version {
+  _Version(this.major, this.minor, this.patch);
+
+  final int major;
+  final int minor;
+  final int patch;
+
+  @override
+  String toString() => '$major.$minor.$patch';
 }
 
 /// Represents a validation issue found in the spec.
