@@ -167,9 +167,10 @@ class CircuitBreakerInterceptor implements RequestInterceptor, ResponseIntercept
 
   /// Called before request to check circuit state.
   ///
-  /// This is a helper method that should be called by request interceptors
-  /// to check if the circuit is open before making a request.
-  Future<HttpRequest> checkCircuit(HttpRequest request) async {
+  /// This method implements RequestInterceptor interface to check
+  /// if the circuit is open before making a request.
+  @override
+  Future<HttpRequest> onRequest(HttpRequest request) async {
     _checkReset();
 
     if (_state == CircuitState.open) {
