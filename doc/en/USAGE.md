@@ -217,6 +217,36 @@ try {
 }
 ```
 
+### Working with response headers
+
+When response headers are defined in the OpenAPI specification, methods return `ApiResponse<T>` instead of `T` directly:
+
+```dart
+// If headers are defined in the spec:
+// responses:
+//   '200':
+//     headers:
+//       ETag:
+//         schema:
+//           type: string
+//       X-RateLimit-Limit:
+//         schema:
+//           type: integer
+//           required: true
+
+final response = await client.defaultApi.getUser(id: '123');
+final user = response.data; // User or Map<String, dynamic>
+final etag = response.headers['ETag']; // String?
+final rateLimit = response.headers['X-RateLimit-Limit']; // String?
+
+// If headers are not defined in the spec, method returns data directly:
+final user = await client.defaultApi.getUser(id: '123'); // User or Map<String, dynamic>
+```
+
+`ApiResponse<T>` provides:
+- `data`: Response body (typed data)
+- `headers`: Map<String, String> with all response headers
+
 ### Resource Management
 
 Always close the client when done:

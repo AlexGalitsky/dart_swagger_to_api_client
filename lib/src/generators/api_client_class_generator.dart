@@ -67,6 +67,26 @@ class ApiClientClassGenerator {
 
 ${importsBuffer.toString()}
 $customAdapterDoc
+/// Response wrapper that includes both data and headers.
+///
+/// This class is used when the OpenAPI specification defines response headers.
+/// It provides type-safe access to both the response body data and headers.
+class ApiResponse<T> {
+  const ApiResponse({
+    required this.data,
+    required this.headers,
+  });
+
+  /// The response body data.
+  final T data;
+
+  /// Response headers as a map.
+  ///
+  /// Headers are case-insensitive in HTTP, but this map preserves the original
+  /// case from the response. Use case-insensitive lookup if needed.
+  final Map<String, String> headers;
+}
+
 /// Main entry point for working with the API.
 class ApiClient {
   ApiClient(this._config);

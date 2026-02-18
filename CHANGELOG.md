@@ -1,3 +1,17 @@
+## 1.1.1
+
+### Added
+- **Response headers support**: Added support for response headers from OpenAPI specification
+  - Automatic parsing of response headers from `responses[statusCode].headers` in OpenAPI spec
+  - Generation of `ApiResponse<T>` wrapper class when headers are defined
+  - Type-safe access to response headers via `response.headers` map
+  - Support for required and optional headers (nullable types)
+  - Backward compatibility: methods without headers return data directly (no wrapper)
+
+### Changed
+- Methods with response headers now return `ApiResponse<T>` instead of `T` directly
+- `ApiResponse<T>` class provides access to both `data` and `headers` fields
+
 ## 1.1.0
 
 ### Added

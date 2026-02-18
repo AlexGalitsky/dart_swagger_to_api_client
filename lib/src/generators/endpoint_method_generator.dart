@@ -561,8 +561,25 @@ class EndpointMethodGenerator {
         );
         buffer.writeln('    }');
         buffer.writeln();
+        
+        // Generate data deserialization
+        String dataExpression;
         if (responseTypeInfo.kind == _ResponseKind.voidResponse) {
-          buffer.writeln('    return;');
+          if (responseTypeInfo.hasHeaders) {
+            // For void response with headers, return ApiResponse<void>
+            buffer.writeln('    return ApiResponse<void>(');
+            buffer.writeln('      data: null,');
+            buffer.writeln('      headers: response.headers,');
+            buffer.writeln('    );');
+            buffer.writeln('  }');
+            buffer.writeln();
+            continue;
+          } else {
+            buffer.writeln('    return;');
+            buffer.writeln('  }');
+            buffer.writeln();
+            continue;
+          }
         } else if (responseTypeInfo.modelType != null) {
           // Generate deserialization for model type
           if (responseTypeInfo.isList) {
@@ -570,28 +587,42 @@ class EndpointMethodGenerator {
               '    final list = jsonDecode(response.body) as List<dynamic>;',
             );
             buffer.writeln(
-              '    return list.map((json) => ${responseTypeInfo.modelType}.fromJson(json as Map<String, dynamic>)).toList();',
+              '    final data = list.map((json) => ${responseTypeInfo.modelType}.fromJson(json as Map<String, dynamic>)).toList();',
             );
+            dataExpression = 'data';
           } else {
             buffer.writeln(
               '    final json = jsonDecode(response.body) as Map<String, dynamic>;',
             );
             buffer.writeln(
-              '    return ${responseTypeInfo.modelType}.fromJson(json);',
+              '    final data = ${responseTypeInfo.modelType}.fromJson(json);',
             );
+            dataExpression = 'data';
           }
         } else if (responseTypeInfo.kind == _ResponseKind.mapResponse) {
           buffer.writeln(
             '    final json = jsonDecode(response.body) as Map<String, dynamic>;',
           );
-          buffer.writeln('    return json;');
+          buffer.writeln('    final data = json;');
+          dataExpression = 'data';
         } else {
           buffer.writeln(
             '    final list = jsonDecode(response.body) as List<dynamic>;',
           );
           buffer.writeln(
-            '    return list.cast<Map<String, dynamic>>();',
+            '    final data = list.cast<Map<String, dynamic>>();',
           );
+          dataExpression = 'data';
+        }
+        
+        // Return data with or without ApiResponse wrapper
+        if (responseTypeInfo.hasHeaders) {
+          buffer.writeln('    return ApiResponse(');
+          buffer.writeln('      data: $dataExpression,');
+          buffer.writeln('      headers: response.headers,');
+          buffer.writeln('    );');
+        } else {
+          buffer.writeln('    return $dataExpression;');
         }
         buffer.writeln('  }');
         buffer.writeln();
@@ -1005,7 +1036,11 @@ class EndpointMethodGenerator {
 
     // Explicit 204 response is treated as void.
     if (responses.containsKey('204')) {
-      return _ResponseTypeInfo.voidResponse;
+      final headers = _parseResponseHeaders(responses['204']);
+      return _ResponseTypeInfo(
+        kind: _ResponseKind.voidResponse,
+        headers: headers,
+      );
     }
 
     // Otherwise, check primary success response (200/201/202).
@@ -1014,9 +1049,15 @@ class EndpointMethodGenerator {
       return _ResponseTypeInfo.mapResponse;
     }
 
+    // Parse response headers
+    final headers = _parseResponseHeaders(success);
+
     final content = success['content'];
     if (content is! Map || content.isEmpty) {
-      return _ResponseTypeInfo.voidResponse;
+      return _ResponseTypeInfo(
+        kind: _ResponseKind.voidResponse,
+        headers: headers,
+      );
     }
 
     // Look at the first media type schema.
@@ -1035,11 +1076,13 @@ class EndpointMethodGenerator {
                 kind: _ResponseKind.listOfMapsResponse,
                 modelType: modelType,
                 isList: true,
+                headers: headers,
               );
             }
             return _ResponseTypeInfo(
               kind: _ResponseKind.mapResponse,
               modelType: modelType,
+              headers: headers,
             );
           }
         }
@@ -1058,16 +1101,62 @@ class EndpointMethodGenerator {
                   kind: _ResponseKind.listOfMapsResponse,
                   modelType: modelType,
                   isList: true,
+                  headers: headers,
                 );
               }
             }
           }
-          return _ResponseTypeInfo.listOfMapsResponse;
+          return _ResponseTypeInfo(
+            kind: _ResponseKind.listOfMapsResponse,
+            isList: true,
+            headers: headers,
+          );
         }
       }
     }
 
-    return _ResponseTypeInfo.mapResponse;
+    return _ResponseTypeInfo(
+      kind: _ResponseKind.mapResponse,
+      headers: headers,
+    );
+  }
+
+  /// Parses response headers from OpenAPI response definition.
+  List<_ResponseHeaderInfo> _parseResponseHeaders(Map<dynamic, dynamic> response) {
+    final headers = response['headers'];
+    if (headers is! Map || headers.isEmpty) {
+      return const [];
+    }
+
+    final result = <_ResponseHeaderInfo>[];
+    for (final entry in headers.entries) {
+      final headerName = entry.key;
+      final headerDef = entry.value;
+      if (headerName is! String || headerDef is! Map) continue;
+
+      final schema = headerDef['schema'] as Map<String, dynamic>?;
+      if (schema == null) continue;
+
+      // Determine Dart type from schema
+      final type = schema['type'] as String?;
+      final dartType = _mapOpenApiTypeToDart(type) ?? 'String';
+      
+      // Check if header is required (default is false for headers)
+      final required = headerDef['required'] == true;
+      final dartTypeWithNullability = required ? dartType : '$dartType?';
+
+      final description = headerDef['description'] as String?;
+      final dartName = _toCamelCase(headerName);
+
+      result.add(_ResponseHeaderInfo(
+        name: headerName,
+        dartName: dartName,
+        dartType: dartTypeWithNullability,
+        description: description,
+      ));
+    }
+
+    return result;
   }
 
   /// Gets the Dart type for requestBody, if it can be resolved from $ref.
@@ -1377,26 +1466,55 @@ class _Param {
   final Map<String, dynamic>? schema; // Full schema for complex types
 }
 
+/// Information about response headers from OpenAPI spec.
+class _ResponseHeaderInfo {
+  const _ResponseHeaderInfo({
+    required this.name,
+    required this.dartName,
+    required this.dartType,
+    this.description,
+  });
+
+  final String name; // Header name (e.g., 'X-RateLimit-Limit')
+  final String dartName; // Dart variable name (e.g., 'xRateLimitLimit')
+  final String dartType; // Dart type (e.g., 'String', 'int', 'String?')
+  final String? description; // Optional description from spec
+}
+
 /// Information about the response type for a generated method.
 class _ResponseTypeInfo {
   const _ResponseTypeInfo({
     required this.kind,
     this.modelType,
     this.isList = false,
+    this.headers = const [],
   });
 
   final _ResponseKind kind;
   final String? modelType; // Dart type name if resolved from $ref
   final bool isList; // true if response is List<ModelType>
+  final List<_ResponseHeaderInfo> headers; // Response headers from spec
 
   static const voidResponse = _ResponseTypeInfo(kind: _ResponseKind.voidResponse);
   static const mapResponse = _ResponseTypeInfo(kind: _ResponseKind.mapResponse);
   static const listOfMapsResponse = _ResponseTypeInfo(kind: _ResponseKind.listOfMapsResponse, isList: true);
 
+  /// Returns true if response has headers defined in spec.
+  bool get hasHeaders => headers.isNotEmpty;
+
   String get dartType {
+    final baseType = _getBaseDartType();
+    if (hasHeaders) {
+      return 'ApiResponse<$baseType>';
+    }
+    return baseType;
+  }
+
+  String _getBaseDartType() {
     switch (kind) {
       case _ResponseKind.voidResponse:
-        return 'void';
+        // For void with headers, we need a nullable type
+        return hasHeaders ? 'void?' : 'void';
       case _ResponseKind.mapResponse:
         if (modelType != null) {
           return modelType!;

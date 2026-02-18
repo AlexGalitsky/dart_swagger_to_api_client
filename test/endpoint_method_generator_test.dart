@@ -701,6 +701,182 @@ void main() {
       // multipart doesn't set Content-Type header (adapter handles it)
       expect(code, isNot(contains("headers['Content-Type'] = 'multipart/form-data'")));
     });
+
+    test('generates GET method with response headers', () async {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/users/{id}': {
+            'get': {
+              'operationId': 'getUser',
+              'parameters': [
+                {
+                  'name': 'id',
+                  'in': 'path',
+                  'required': true,
+                  'schema': {'type': 'string'},
+                },
+              ],
+              'responses': {
+                '200': {
+                  'description': 'OK',
+                  'headers': {
+                    'ETag': {
+                      'schema': {
+                        'type': 'string',
+                      },
+                      'description': 'Entity tag',
+                    },
+                    'X-RateLimit-Limit': {
+                      'schema': {
+                        'type': 'integer',
+                      },
+                      'required': true,
+                    },
+                  },
+                  'content': {
+                    'application/json': {
+                      'schema': {
+                        'type': 'object',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
+
+      expect(code, contains('Future<ApiResponse<Map<String, dynamic>>> getUser({'));
+      expect(code, contains('required String id'));
+      expect(code, contains('return ApiResponse('));
+      expect(code, contains('data: data,'));
+      expect(code, contains('headers: response.headers,'));
+    });
+
+    test('generates method without ApiResponse when no headers defined', () async {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/users': {
+            'get': {
+              'operationId': 'getUsers',
+              'responses': {
+                '200': {
+                  'description': 'OK',
+                  'content': {
+                    'application/json': {
+                      'schema': {
+                        'type': 'array',
+                        'items': {
+                          'type': 'object',
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
+
+      expect(code, contains('Future<List<Map<String, dynamic>>> getUsers({'));
+      expect(code, isNot(contains('ApiResponse')));
+      expect(code, contains('final data = list.cast<Map<String, dynamic>>();'));
+      expect(code, contains('return data;'));
+    });
+
+    test('generates void response with headers', () async {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/ping': {
+            'post': {
+              'operationId': 'ping',
+              'requestBody': {
+                'content': {
+                  'application/json': {
+                    'schema': {
+                      'type': 'object',
+                    },
+                  },
+                },
+              },
+              'responses': {
+                '204': {
+                  'description': 'No Content',
+                  'headers': {
+                    'X-Request-ID': {
+                      'schema': {
+                        'type': 'string',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
+
+      expect(code, contains('Future<ApiResponse<void?>> ping({'));
+      expect(code, contains('return ApiResponse<void>('));
+      expect(code, contains('data: null,'));
+      expect(code, contains('headers: response.headers,'));
+    });
+
+    test('generates method with optional response headers', () async {
+      final spec = <String, dynamic>{
+        'paths': {
+          '/resource': {
+            'get': {
+              'operationId': 'getResource',
+              'responses': {
+                '200': {
+                  'description': 'OK',
+                  'headers': {
+                    'ETag': {
+                      'schema': {
+                        'type': 'string',
+                      },
+                      // required is false by default
+                    },
+                    'X-RateLimit-Remaining': {
+                      'schema': {
+                        'type': 'integer',
+                      },
+                      'required': false,
+                    },
+                  },
+                  'content': {
+                    'application/json': {
+                      'schema': {
+                        'type': 'object',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      final result = await generator.generateDefaultApiMethods(spec);
+      final code = result.methods;
+
+      expect(code, contains('Future<ApiResponse<Map<String, dynamic>>> getResource({'));
+      expect(code, contains('return ApiResponse('));
+      expect(code, contains('headers: response.headers,'));
+    });
   });
 }
 

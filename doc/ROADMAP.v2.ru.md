@@ -127,9 +127,13 @@
   - [ ] Discriminator support
   - > Требует продуманной модели типов и может быть вынесено в отдельный минорный релиз
 
-- [ ] **Response headers**
-  - [ ] Генерация типов для response headers
-  - [ ] Доступ к headers в сгенерированном коде
+- [x] **Response headers** ✅ ЗАВЕРШЕНО
+  - [x] Генерация типов для response headers
+  - [x] Доступ к headers в сгенерированном коде
+  - [x] Автоматический парсинг headers из OpenAPI спецификации
+  - [x] Класс `ApiResponse<T>` для обертки response с headers
+  - [x] Поддержка required и optional headers (nullable типы)
+  - [x] Обратная совместимость: методы без headers возвращают данные напрямую
 
 - [ ] **Streaming responses**
   - [ ] Поддержка streaming responses

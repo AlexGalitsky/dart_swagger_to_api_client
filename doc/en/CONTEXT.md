@@ -185,10 +185,15 @@ class HttpResponse {
   - `application/xml`: Passed as string for simple types or serialized for complex (type: `String` or `Map<String, dynamic>`)
   - Support for multiple content types with automatic priority-based selection
 - **Response Types**:
-  - `204 No Content` → `Future<void>`
-  - Empty content → `Future<void>`
-  - Object schema → `Future<Map<String, dynamic>>` or `Future<ModelType>`
-  - Array schema → `Future<List<Map<String, dynamic>>>` or `Future<List<ModelType>>`
+  - `204 No Content` → `Future<void>` or `Future<ApiResponse<void?>>` (if headers present)
+  - Empty content → `Future<void>` or `Future<ApiResponse<void?>>` (if headers present)
+  - Object schema → `Future<Map<String, dynamic>>` or `Future<ModelType>` or `Future<ApiResponse<...>>` (if headers present)
+  - Array schema → `Future<List<Map<String, dynamic>>>` or `Future<List<ModelType>>` or `Future<ApiResponse<...>>` (if headers present)
+- **Response headers**:
+  - Automatic parsing of headers from OpenAPI spec (`responses[statusCode].headers`)
+  - Generation of `ApiResponse<T>` wrapper when headers are defined in spec
+  - Access to headers via `response.headers` (Map<String, String>)
+  - Support for required and optional headers (nullable types)
 
 ### Model Resolution
 
