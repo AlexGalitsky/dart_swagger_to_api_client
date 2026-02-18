@@ -12,6 +12,7 @@ import 'api_client_generator_test.dart' as generator_test;
 import 'auth_config_test.dart' as auth_config_test;
 import 'config_loader_env_test.dart' as config_loader_env_test;
 import 'config_loader_test.dart' as config_loader_test;
+import 'config_validator_test.dart' as config_validator_test;
 import 'custom_adapter_test.dart' as custom_adapter_test;
 import 'dio_http_client_adapter_test.dart' as dio_adapter_test;
 import 'multipart_test.dart' as multipart_test;
@@ -35,6 +36,7 @@ void main() {
   // Configuration tests
   config_loader_test.main();
   config_loader_env_test.main();
+  config_validator_test.main();
   auth_config_test.main();
   models_config_loader_test.main();
 
