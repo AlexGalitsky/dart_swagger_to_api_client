@@ -14,6 +14,7 @@ export 'src/core/errors.dart';
 export 'src/core/spec_validator.dart';
 export 'src/core/spec_cache.dart';
 export 'src/core/spec_loader.dart';
+export 'src/core/security_schemes_parser.dart';
 export 'src/core/middleware.dart';
 export 'src/core/middleware/logging_middleware.dart';
 export 'src/core/middleware/retry_middleware.dart';

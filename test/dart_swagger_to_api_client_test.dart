@@ -8,6 +8,7 @@
 
 import 'advanced_parameters_test.dart' as advanced_parameters_test;
 import 'api_client_facade_integration_test.dart' as facade_integration_test;
+import 'security_schemes_test.dart' as security_schemes_test;
 import 'api_client_facade_test.dart' as facade_test;
 import 'api_client_generator_test.dart' as generator_test;
 import 'auth_config_test.dart' as auth_config_test;
@@ -71,4 +72,7 @@ void main() {
 
   // Advanced parameters support
   advanced_parameters_test.main();
+
+  // Security schemes support
+  security_schemes_test.main();
 }

@@ -126,17 +126,20 @@
   - [ ] Поддержка streaming responses
   - [ ] Генерация методов для streaming данных
 
-### 1.1.4 Security schemes
+### 1.1.4 Security schemes ✅ ЗАВЕРШЕНО
 
-- [ ] **Расширенная аутентификация**
-  - [ ] OAuth2 support (authorization code, client credentials, etc.)
-  - [ ] OpenID Connect support
-  - [ ] API Key в различных местах (cookie, header, query)
-  - [ ] HTTP Basic/Digest authentication
+- [x] **Расширенная аутентификация**
+  - [x] OAuth2 support (access token через resolveOAuth2AccessToken)
+  - [x] OpenID Connect support (token через resolveOpenIdConnectToken)
+  - [x] API Key в различных местах (cookie, header, query) - полная поддержка
+  - [x] HTTP Basic authentication (через resolveBasicAuthUsername/Password)
+  - [x] HTTP Bearer authentication (с поддержкой bearerFormat)
 
-- [ ] **Security на уровне операций**
-  - [ ] Поддержка различных security schemes для разных операций
-  - [ ] Генерация методов с правильной аутентификацией
+- [x] **Security на уровне операций**
+  - [x] Поддержка различных security schemes для разных операций
+  - [x] Генерация методов с правильной аутентификацией
+  - [x] Operation-level security переопределяет global security
+  - [x] Парсинг security schemes из OpenAPI 3.0 и Swagger 2.0
 
 ## v1.2 — Улучшение Developer Experience
 

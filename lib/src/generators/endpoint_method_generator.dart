@@ -1,4 +1,5 @@
 import '../models/models_resolver.dart';
+import '../core/security_schemes_parser.dart';
 
 /// Generates endpoint methods for API client classes.
 ///
@@ -24,8 +25,13 @@ class EndpointMethodGenerator {
       return (methods: '', imports: <String>{});
     }
 
+    // Parse security schemes from spec
+    final securitySchemes = _parseSecuritySchemes(spec);
+    final globalSecurity = SecuritySchemesParser.parseGlobalSecurity(spec);
+
     final buffer = StringBuffer();
     final imports = <String>{};
+    bool needsBase64Import = false;
 
     // Process paths sequentially to allow async operations
     for (final pathEntry in paths.entries) {
@@ -96,6 +102,30 @@ class EndpointMethodGenerator {
           continue;
         }
 
+        // Parse security for this operation
+        final operationSecurity = SecuritySchemesParser.parseOperationSecurity(rawOperation as Map<String, dynamic>);
+        final effectiveSecurity = operationSecurity.isNotEmpty ? operationSecurity : globalSecurity;
+        
+        // Check if we need to add API key to query parameters from security schemes
+        String? apiKeyQueryName;
+        if (effectiveSecurity.isNotEmpty) {
+          final securityRequirement = effectiveSecurity.first;
+          for (final entry in securityRequirement.entries) {
+            final schemeName = entry.key;
+            final scheme = securitySchemes[schemeName];
+            if (scheme != null) {
+              final schemeType = SecuritySchemesParser.getSchemeType(scheme);
+              if (schemeType == 'apiKey') {
+                final location = SecuritySchemesParser.getApiKeyLocation(scheme);
+                if (location == 'query') {
+                  apiKeyQueryName = SecuritySchemesParser.getApiKeyName(scheme);
+                  break; // Found API key in query, no need to continue
+                }
+              }
+            }
+          }
+        }
+
         final responseTypeInfo = await _classifyResponse(rawOperation);
         final requestBodyType = await _getRequestBodyType(rawOperation);
         final requestBodyContentType = _getRequestBodyContentType(rawOperation);
@@ -145,7 +175,10 @@ class EndpointMethodGenerator {
         // Check if we need to handle arrays with explode (multiple query params with same name)
         final hasExplodedArrays = queryParams.any((p) => p.isArray && p.explode && p.style == 'form');
         
-        if (queryParams.isNotEmpty || hasExplodedArrays) {
+        // Check if we need query parameters (from params or API key in query from security scheme)
+        final needsQueryParams = queryParams.isNotEmpty || hasExplodedArrays || apiKeyQueryName != null;
+        
+        if (needsQueryParams) {
           if (hasExplodedArrays) {
             // Use queryParametersAll for arrays with explode
             buffer.writeln(
@@ -206,13 +239,20 @@ class EndpointMethodGenerator {
             }
             
             buffer.writeln('    final auth = _config.auth;');
-            buffer.writeln(
-              '    if (auth?.apiKeyQuery != null && auth?.apiKey != null) {',
-            );
-            buffer.writeln(
-              '      queryParametersAll[auth!.apiKeyQuery!] = [auth.apiKey!];',
-            );
-            buffer.writeln('    }');
+            // Add API key from security scheme or config
+            if (apiKeyQueryName != null) {
+              buffer.writeln('    if (auth?.apiKey != null) {');
+              buffer.writeln("      queryParametersAll['$apiKeyQueryName'] = [auth!.apiKey!];");
+              buffer.writeln('    }');
+            } else {
+              buffer.writeln(
+                '    if (auth?.apiKeyQuery != null && auth?.apiKey != null) {',
+              );
+              buffer.writeln(
+                '      queryParametersAll[auth!.apiKeyQuery!] = [auth.apiKey!];',
+              );
+              buffer.writeln('    }');
+            }
             
             // Build URI with queryParametersAll
             buffer.writeln('    final uriBuilder = _config.baseUrl.replace(path: _path);');
@@ -268,13 +308,20 @@ class EndpointMethodGenerator {
               }
             }
             buffer.writeln('    final auth = _config.auth;');
-            buffer.writeln(
-              '    if (auth?.apiKeyQuery != null && auth?.apiKey != null) {',
-            );
-            buffer.writeln(
-              '      queryParameters[auth!.apiKeyQuery!] = auth.apiKey!;',
-            );
-            buffer.writeln('    }');
+            // Add API key from security scheme or config
+            if (apiKeyQueryName != null) {
+              buffer.writeln('    if (auth?.apiKey != null) {');
+              buffer.writeln("      queryParameters['$apiKeyQueryName'] = auth!.apiKey!;");
+              buffer.writeln('    }');
+            } else {
+              buffer.writeln(
+                '    if (auth?.apiKeyQuery != null && auth?.apiKey != null) {',
+              );
+              buffer.writeln(
+                '      queryParameters[auth!.apiKeyQuery!] = auth.apiKey!;',
+              );
+              buffer.writeln('    }');
+            }
             buffer.writeln(
               '    final uri = _config.baseUrl.replace('
               'path: _path, '
@@ -343,22 +390,52 @@ class EndpointMethodGenerator {
           buffer.writeln('    }');
         }
         
-        buffer.writeln('    final auth = _config.auth;');
-        buffer.writeln('    if (auth != null) {');
-        buffer.writeln('      final bearerToken = auth.resolveBearerToken();');
-        buffer.writeln('      if (bearerToken != null) {');
-        buffer.writeln(
-          "        headers['Authorization'] = 'Bearer \$bearerToken';",
-        );
-        buffer.writeln('      }');
-        buffer.writeln(
-          '      if (auth.apiKeyHeader != null && auth.apiKey != null) {',
-        );
-        buffer.writeln(
-          '        headers[auth.apiKeyHeader!] = auth.apiKey!;',
-        );
-        buffer.writeln('      }');
-        buffer.writeln('    }');
+        // Apply security schemes (skip API key in query as it's already handled above)
+        // Note: effectiveSecurity is already computed above
+        
+        if (effectiveSecurity.isNotEmpty) {
+          // Use first security requirement (OpenAPI allows multiple alternatives)
+          final securityRequirement = effectiveSecurity.first;
+          // Filter out API key in query as it's already handled
+          final filteredRequirement = Map<String, List<String>>.fromEntries(
+            securityRequirement.entries.where((entry) {
+              final scheme = securitySchemes[entry.key];
+              if (scheme == null) return true;
+              final schemeType = SecuritySchemesParser.getSchemeType(scheme);
+              if (schemeType == 'apiKey') {
+                final location = SecuritySchemesParser.getApiKeyLocation(scheme);
+                return location != 'query'; // Skip query API keys, already handled
+              }
+              return true;
+            }),
+          );
+          
+          if (filteredRequirement.isNotEmpty) {
+            final needsBase64 = _generateSecurityCode(buffer, filteredRequirement, securitySchemes);
+            if (needsBase64 && !needsBase64Import) {
+              needsBase64Import = true;
+              imports.add('dart:convert');
+            }
+          }
+        } else {
+          // Fallback to legacy auth config for backward compatibility
+          buffer.writeln('    final auth = _config.auth;');
+          buffer.writeln('    if (auth != null) {');
+          buffer.writeln('      final bearerToken = auth.resolveBearerToken();');
+          buffer.writeln('      if (bearerToken != null) {');
+          buffer.writeln(
+            "        headers['Authorization'] = 'Bearer \$bearerToken';",
+          );
+          buffer.writeln('      }');
+          buffer.writeln(
+            '      if (auth.apiKeyHeader != null && auth.apiKey != null) {',
+          );
+          buffer.writeln(
+            '        headers[auth.apiKeyHeader!] = auth.apiKey!;',
+          );
+          buffer.writeln('      }');
+          buffer.writeln('    }');
+        }
         buffer.writeln();
         // Serialize body if present
         String? bodyExpression;
@@ -946,6 +1023,160 @@ class EndpointMethodGenerator {
       return null;
     }
     return result;
+  }
+
+  /// Parses security schemes from OpenAPI/Swagger spec.
+  Map<String, Map<String, dynamic>> _parseSecuritySchemes(Map<String, dynamic> spec) {
+    // Detect OpenAPI version
+    if (spec.containsKey('openapi')) {
+      return SecuritySchemesParser.parseOpenApi3(spec);
+    } else if (spec.containsKey('swagger')) {
+      return SecuritySchemesParser.parseSwagger2(spec);
+    }
+    return {};
+  }
+
+  /// Generates authentication code based on security schemes.
+  ///
+  /// Returns true if base64 encoding is needed (for Basic auth).
+  bool _generateSecurityCode(
+    StringBuffer buffer,
+    Map<String, List<String>> securityRequirement,
+    Map<String, Map<String, dynamic>> securitySchemes,
+  ) {
+    bool needsBase64 = false;
+    buffer.writeln('    final auth = _config.auth;');
+    buffer.writeln('    if (auth != null) {');
+
+    for (final entry in securityRequirement.entries) {
+      final schemeName = entry.key;
+      final scopes = entry.value;
+      final scheme = securitySchemes[schemeName];
+
+      if (scheme == null) continue;
+
+      final schemeType = SecuritySchemesParser.getSchemeType(scheme);
+
+      switch (schemeType) {
+        case 'apiKey':
+          _generateApiKeyAuth(buffer, scheme);
+          break;
+        case 'http':
+          final needs = _generateHttpAuth(buffer, scheme);
+          if (needs) needsBase64 = true;
+          break;
+        case 'oauth2':
+          _generateOAuth2Auth(buffer, scheme, scopes);
+          break;
+        case 'openIdConnect':
+          _generateOpenIdConnectAuth(buffer, scheme, scopes);
+          break;
+      }
+    }
+
+    buffer.writeln('    }');
+    return needsBase64;
+  }
+
+  /// Generates API key authentication code.
+  void _generateApiKeyAuth(
+    StringBuffer buffer,
+    Map<String, dynamic> scheme,
+  ) {
+    final location = SecuritySchemesParser.getApiKeyLocation(scheme);
+    final name = SecuritySchemesParser.getApiKeyName(scheme);
+
+    if (name == null) return;
+
+    switch (location) {
+      case 'header':
+        buffer.writeln('      if (auth.apiKeyHeader != null && auth.apiKey != null) {');
+        buffer.writeln("        headers[auth.apiKeyHeader!] = auth.apiKey!;");
+        buffer.writeln('      }');
+        break;
+      case 'query':
+        // API key in query is handled in query parameters section
+        // The name from security scheme should match apiKeyQuery in config
+        // This is already handled in the query parameters section above
+        break;
+      case 'cookie':
+        buffer.writeln('      if (auth.apiKeyCookie != null && auth.apiKey != null) {');
+        buffer.writeln("        final cookieValue = '\${auth.apiKeyCookie!}=\${Uri.encodeComponent(auth.apiKey!)}';");
+        buffer.writeln("        if (headers.containsKey('Cookie')) {");
+        buffer.writeln("          headers['Cookie'] = '\${headers['Cookie']}; \$cookieValue';");
+        buffer.writeln('        } else {');
+        buffer.writeln("          headers['Cookie'] = cookieValue;");
+        buffer.writeln('        }');
+        buffer.writeln('      }');
+        break;
+    }
+  }
+
+  /// Generates HTTP authentication code (Basic, Bearer, Digest).
+  ///
+  /// Returns true if base64 encoding is needed.
+  bool _generateHttpAuth(
+    StringBuffer buffer,
+    Map<String, dynamic> scheme,
+  ) {
+    bool needsBase64 = false;
+    final httpScheme = SecuritySchemesParser.getHttpScheme(scheme);
+
+    switch (httpScheme) {
+      case 'basic':
+        needsBase64 = true;
+        buffer.writeln('      final basicUsername = auth.resolveBasicAuthUsername();');
+        buffer.writeln('      final basicPassword = auth.resolveBasicAuthPassword();');
+        buffer.writeln('      if (basicUsername != null && basicPassword != null) {');
+        buffer.writeln('        final credentials = base64Encode(utf8.encode(\'\$basicUsername:\$basicPassword\'));');
+        buffer.writeln("        headers['Authorization'] = 'Basic \$credentials';");
+        buffer.writeln('      }');
+        break;
+      case 'bearer':
+        final bearerFormat = SecuritySchemesParser.getBearerFormat(scheme);
+        buffer.writeln('      final bearerToken = auth.resolveBearerToken();');
+        buffer.writeln('      if (bearerToken != null) {');
+        if (bearerFormat != null && bearerFormat != 'JWT') {
+          buffer.writeln("        headers['Authorization'] = '\$bearerFormat \$bearerToken';");
+        } else {
+          buffer.writeln("        headers['Authorization'] = 'Bearer \$bearerToken';");
+        }
+        buffer.writeln('      }');
+        break;
+      case 'digest':
+        // Digest authentication is complex and typically requires challenge-response
+        // For now, we'll generate a placeholder
+        buffer.writeln('      // Digest authentication requires challenge-response flow');
+        buffer.writeln('      // This is not yet fully implemented');
+        break;
+    }
+    return needsBase64;
+  }
+
+  /// Generates OAuth2 authentication code.
+  void _generateOAuth2Auth(
+    StringBuffer buffer,
+    Map<String, dynamic> scheme,
+    List<String> scopes,
+  ) {
+    buffer.writeln('      final oauth2Token = auth.resolveOAuth2AccessToken();');
+    buffer.writeln('      if (oauth2Token != null) {');
+    buffer.writeln("        headers['Authorization'] = 'Bearer \$oauth2Token';");
+    buffer.writeln('      }');
+    // Note: OAuth2 client credentials flow would require token endpoint
+    // This is typically handled at runtime, not in generated code
+  }
+
+  /// Generates OpenID Connect authentication code.
+  void _generateOpenIdConnectAuth(
+    StringBuffer buffer,
+    Map<String, dynamic> scheme,
+    List<String> scopes,
+  ) {
+    buffer.writeln('      final oidcToken = auth.resolveOpenIdConnectToken();');
+    buffer.writeln('      if (oidcToken != null) {');
+    buffer.writeln("        headers['Authorization'] = 'Bearer \$oidcToken';");
+    buffer.writeln('      }');
   }
 }
 

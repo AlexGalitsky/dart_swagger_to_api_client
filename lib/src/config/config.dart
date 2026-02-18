@@ -13,13 +13,17 @@ import '../core/middleware.dart';
 
 /// Authentication options for the generated client.
 ///
-/// At v0.1 we support simple API key and bearer token scenarios.
+/// Supports multiple authentication schemes: API key, Bearer token, OAuth2,
+/// HTTP Basic/Digest, and OpenID Connect.
 class AuthConfig {
   /// Header name for API key, e.g. `X-API-Key`.
   final String? apiKeyHeader;
 
   /// Query parameter name for API key, e.g. `api_key`.
   final String? apiKeyQuery;
+
+  /// Cookie name for API key.
+  final String? apiKeyCookie;
 
   /// Static API key value.
   ///
@@ -39,12 +43,61 @@ class AuthConfig {
   /// If the variable is not set, authentication will fail.
   final String? bearerTokenEnv;
 
+  /// HTTP Basic authentication username.
+  final String? basicAuthUsername;
+
+  /// HTTP Basic authentication password.
+  final String? basicAuthPassword;
+
+  /// Environment variable name for Basic auth username.
+  final String? basicAuthUsernameEnv;
+
+  /// Environment variable name for Basic auth password.
+  final String? basicAuthPasswordEnv;
+
+  /// OAuth2 access token.
+  final String? oauth2AccessToken;
+
+  /// Environment variable name for OAuth2 access token.
+  final String? oauth2AccessTokenEnv;
+
+  /// OAuth2 client ID (for client credentials flow).
+  final String? oauth2ClientId;
+
+  /// OAuth2 client secret (for client credentials flow).
+  final String? oauth2ClientSecret;
+
+  /// OAuth2 token URL (for client credentials flow).
+  final Uri? oauth2TokenUrl;
+
+  /// OAuth2 scopes (for client credentials flow).
+  final List<String>? oauth2Scopes;
+
+  /// OpenID Connect access token.
+  final String? openIdConnectToken;
+
+  /// Environment variable name for OpenID Connect token.
+  final String? openIdConnectTokenEnv;
+
   const AuthConfig({
     this.apiKeyHeader,
     this.apiKeyQuery,
+    this.apiKeyCookie,
     this.apiKey,
     this.bearerToken,
     this.bearerTokenEnv,
+    this.basicAuthUsername,
+    this.basicAuthPassword,
+    this.basicAuthUsernameEnv,
+    this.basicAuthPasswordEnv,
+    this.oauth2AccessToken,
+    this.oauth2AccessTokenEnv,
+    this.oauth2ClientId,
+    this.oauth2ClientSecret,
+    this.oauth2TokenUrl,
+    this.oauth2Scopes,
+    this.openIdConnectToken,
+    this.openIdConnectTokenEnv,
   });
 
   /// Resolves the bearer token value.
@@ -58,6 +111,50 @@ class AuthConfig {
     }
     if (bearerTokenEnv != null) {
       return _getEnv(bearerTokenEnv!);
+    }
+    return null;
+  }
+
+  /// Resolves Basic auth username.
+  String? resolveBasicAuthUsername() {
+    if (basicAuthUsername != null) {
+      return basicAuthUsername;
+    }
+    if (basicAuthUsernameEnv != null) {
+      return _getEnv(basicAuthUsernameEnv!);
+    }
+    return null;
+  }
+
+  /// Resolves Basic auth password.
+  String? resolveBasicAuthPassword() {
+    if (basicAuthPassword != null) {
+      return basicAuthPassword;
+    }
+    if (basicAuthPasswordEnv != null) {
+      return _getEnv(basicAuthPasswordEnv!);
+    }
+    return null;
+  }
+
+  /// Resolves OAuth2 access token.
+  String? resolveOAuth2AccessToken() {
+    if (oauth2AccessToken != null) {
+      return oauth2AccessToken;
+    }
+    if (oauth2AccessTokenEnv != null) {
+      return _getEnv(oauth2AccessTokenEnv!);
+    }
+    return null;
+  }
+
+  /// Resolves OpenID Connect token.
+  String? resolveOpenIdConnectToken() {
+    if (openIdConnectToken != null) {
+      return openIdConnectToken;
+    }
+    if (openIdConnectTokenEnv != null) {
+      return _getEnv(openIdConnectTokenEnv!);
     }
     return null;
   }
