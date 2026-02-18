@@ -46,7 +46,7 @@ http:
       expect(config.auth!.apiKeyQuery, 'api_key');
       expect(config.auth!.apiKey, 'secret');
       expect(config.auth!.bearerToken, 'token');
-      expect(config.httpAdapter, 'http');
+      expect(config.httpAdapter, 'custom');
       expect(config.customAdapterType, 'MyCustomHttpClientAdapter');
     });
   });
