@@ -14,3 +14,5 @@ export 'src/core/middleware.dart';
 export 'src/core/middleware/logging_middleware.dart';
 export 'src/core/middleware/retry_middleware.dart';
 export 'src/core/middleware/rate_limit_middleware.dart';
+export 'src/core/middleware/circuit_breaker_middleware.dart';
+export 'src/core/middleware/transformer_middleware.dart';

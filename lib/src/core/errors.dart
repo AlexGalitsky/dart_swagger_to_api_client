@@ -27,3 +27,8 @@ class ApiAuthException extends ApiClientException {
       : super(message, statusCode: statusCode);
 }
 
+/// Represents timeout errors.
+class TimeoutException extends ApiClientException {
+  TimeoutException(String message, Duration timeout)
+      : super(message, statusCode: null);
+}

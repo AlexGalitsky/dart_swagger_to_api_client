@@ -212,7 +212,10 @@ dart_swagger_to_api_client — Дорожная карта
   - ✅ Подключаемые пользовательские интерсепторы:
     - ✅ Поддержка кастомных `RequestInterceptor` и `ResponseInterceptor`
     - ✅ Интеграция в `ApiClientConfig` через `requestInterceptors` и `responseInterceptors`
-  - ❌ Расширенные возможности (circuit breaker, request/response трансформации) — отложено
+  - ✅ Расширенные возможности:
+    - ✅ Circuit breaker (`CircuitBreakerInterceptor`) — предотвращает каскадные сбои
+    - ✅ Request/response трансформации (`TransformerInterceptor`) — модификация запросов и ответов
+    - ✅ Helper классы для общих трансформаций (`RequestTransformers`, `ResponseTransformers`)
 
 - **0.8.0 Интеграции**
   - Примеры/генерация кода для интеграции со state management (Riverpod/BLoC) поверх клиента.

@@ -87,7 +87,42 @@ class MiddlewareHttpClientAdapter implements HttpClientAdapter {
     // Apply request interceptors in order
     HttpRequest processedRequest = request;
     for (final interceptor in _requestInterceptors) {
-      processedRequest = await interceptor.onRequest(processedRequest);
+      try {
+        processedRequest = await interceptor.onRequest(processedRequest);
+      } catch (e) {
+        // If request interceptor throws, handle it through error handlers
+        // This allows circuit breakers to block requests early
+        Object error = e;
+        
+        // Apply error handlers in reverse order
+        bool handled = false;
+        HttpResponse? response;
+        for (var i = _responseInterceptors.length - 1; i >= 0; i--) {
+          try {
+            final result = await _responseInterceptors[i].onError(error, processedRequest);
+            response = result;
+            handled = true;
+            break;
+          } catch (e2) {
+            // Handler threw, continue to next handler
+            if (i == 0) {
+              handled = false;
+            }
+          }
+        }
+        
+        if (handled && response != null) {
+          // Error was handled, process response through response interceptors
+          HttpResponse processedResponse = response;
+          for (var i = _responseInterceptors.length - 1; i >= 0; i--) {
+            processedResponse = await _responseInterceptors[i].onResponse(processedResponse);
+          }
+          return processedResponse;
+        }
+        
+        // Not handled, rethrow
+        throw error;
+      }
     }
 
     // Send the request through the underlying adapter with retry logic
