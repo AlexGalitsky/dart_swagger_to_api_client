@@ -20,9 +20,9 @@ client:
     apiKey: secret
     bearerToken: token
 
-http:
-  adapter: http
-  customAdapterType: MyCustomHttpClientAdapter
+      http:
+        adapter: custom
+        customAdapterType: MyCustomHttpClientAdapter
 ''';
 
       final file = File('test/tmp_config.yaml');
