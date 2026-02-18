@@ -1,32 +1,29 @@
-<!-- 
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# dart_swagger_to_api_client
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages). 
+[![Dart](https://img.shields.io/badge/Dart-3.11.0+-blue.svg)](https://dart.dev)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages). 
--->
+> **Generate type-safe HTTP API clients from OpenAPI/Swagger specifications**
 
-`dart_swagger_to_api_client` — экспериментальный генератор HTTP‑клиента поверх
-OpenAPI/Swagger‑спецификаций и моделей, сгенерированных пакетом
-`dart_swagger_to_models`.
+`dart_swagger_to_api_client` is a code generator that creates fully type-safe, production-ready HTTP clients for Dart and Flutter applications. It works seamlessly with `dart_swagger_to_models` to generate a complete stack: models + API client.
 
-## Getting started
+## ✨ Features
 
-`dart_swagger_to_api_client` — генератор типобезопасного HTTP‑клиента из OpenAPI/Swagger спецификаций.
-Пакет работает в связке с `dart_swagger_to_models` для генерации полного стека: модели + API клиент.
+- 🎯 **Type-safe API calls** — Strongly typed methods generated from OpenAPI specs
+- 🔄 **Multiple HTTP adapters** — Support for `http`, `dio`, and custom adapters
+- 🛡️ **Middleware system** — Logging, retries, rate limiting, circuit breakers, and more
+- 🔐 **Flexible authentication** — API keys, bearer tokens, environment variables
+- 🌍 **Environment profiles** — Easy switching between dev/staging/prod
+- 📦 **Model integration** — Automatic integration with `dart_swagger_to_models`
+- ⚡ **Watch mode** — Auto-regenerate on spec changes
+- 🚀 **CI/CD ready** — Templates for GitHub Actions and GitLab CI
+- 📚 **State management** — Examples for Riverpod and BLoC
 
-### Быстрый старт (End-to-End)
+## 🚀 Quick Start
 
-Полный сценарий использования от спецификации до вызова API:
+### Installation
 
-#### 1. Установка зависимостей
-
-Добавьте пакеты в `pubspec.yaml`:
+Add to your `pubspec.yaml`:
 
 ```yaml
 dev_dependencies:
@@ -34,9 +31,9 @@ dev_dependencies:
   dart_swagger_to_api_client: ^1.0.0
 ```
 
-#### 2. Генерация моделей
+### Basic Usage
 
-Сначала сгенерируйте модели из OpenAPI спецификации:
+1. **Generate models** (using `dart_swagger_to_models`):
 
 ```bash
 dart run dart_swagger_to_models:dart_swagger_to_models \
@@ -45,11 +42,7 @@ dart run dart_swagger_to_models:dart_swagger_to_models \
   --style json_serializable
 ```
 
-Это создаст модели (например, `User`, `Order`) в директории `lib/models/`.
-
-#### 3. Генерация API клиента
-
-Затем сгенерируйте API клиент:
+2. **Generate API client**:
 
 ```bash
 dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
@@ -57,9 +50,7 @@ dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
   --output-dir lib/api_client
 ```
 
-Генератор автоматически обнаружит сгенерированные модели и создаст типобезопасные методы.
-
-#### 4. Использование в коде
+3. **Use in your code**:
 
 ```dart
 import 'package:my_app/api_client/api_client.dart';
@@ -75,7 +66,7 @@ final config = ApiClientConfig(
 final client = ApiClient(config);
 
 try {
-  // Типобезопасный вызов API
+  // Type-safe API call
   final List<User> users = await client.defaultApi.getUsers();
   print('Users: $users');
 } finally {
@@ -83,72 +74,78 @@ try {
 }
 ```
 
-### Расширенные примеры
+## 📖 Documentation
 
-См. директорию `example/` для полных примеров:
-- `complete_example.dart` — полный end-to-end пример
-- `auth_example.dart` — различные методы аутентификации
-- `error_handling_example.dart` — обработка ошибок и retry логика
+- **[Usage Guide](doc/en/USAGE.md)** — Complete usage documentation
+- **[Developer Guide](doc/en/DEVELOPERS.md)** — Contributing and development
+- **[Context for AI](doc/en/CONTEXT.md)** — Quick context restoration for AI assistants
+- **[Roadmap](doc/ROADMAP.ru.md)** — Development roadmap (Russian)
 
-## CLI usage
+## 🎯 Key Concepts
 
-Запустите генератор в своём проекте:
+### HTTP Adapters
 
-```bash
-dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
-  --input swagger/api.yaml \
-  --output-dir lib/api_client
+Choose your HTTP implementation:
+
+```dart
+// Default: package:http
+final config = ApiClientConfig(
+  baseUrl: Uri.parse('https://api.example.com'),
+);
+
+// Dio adapter
+import 'package:dio/dio.dart';
+final dio = Dio();
+final adapter = DioHttpClientAdapter(dio: dio);
+final config = ApiClientConfig(
+  baseUrl: Uri.parse('https://api.example.com'),
+  httpClientAdapter: adapter,
+);
+
+// Custom adapter
+class MyCustomAdapter implements HttpClientAdapter {
+  @override
+  Future<HttpResponse> send(HttpRequest request) async {
+    // Your implementation
+  }
+}
 ```
 
-### CLI опции
+### Middleware
 
-- `--input` / `-i`: Путь к OpenAPI/Swagger спецификации (YAML или JSON). Обязательный.
-- `--output-dir`: Директория, куда будет сгенерирован код. Обязательный.
-- `--config` / `-c`: Путь к файлу конфигурации `dart_swagger_to_api_client.yaml` (опционально).
-- `--verbose` / `-v`: Показывать подробный вывод, включая предупреждения валидации.
-- `--quiet` / `-q`: Показывать только ошибки, скрывать предупреждения.
-- `--env`: Выбрать профиль окружения из конфигурационного файла (например, `dev`, `staging`, `prod`).
-- `--watch` / `-w`: Автоматически регенерировать клиент при изменении спецификации или конфигурационного файла.
-- `--help` / `-h`: Показать справку по использованию.
+Add powerful middleware to your client:
 
-### Валидация спецификации
+```dart
+final config = ApiClientConfig(
+  baseUrl: Uri.parse('https://api.example.com'),
+  requestInterceptors: [
+    RateLimitInterceptor(maxRequests: 100, window: Duration(minutes: 1)),
+    LoggingInterceptor.console(),
+  ],
+  responseInterceptors: [
+    RetryInterceptor(maxRetries: 3),
+    CircuitBreakerInterceptor(failureThreshold: 5),
+  ],
+);
+```
 
-Генератор автоматически валидирует OpenAPI-спецификацию перед генерацией кода:
+### Environment Profiles
 
-- **Ошибки** (errors): блокируют генерацию. Например, отсутствие секции `paths`.
-- **Предупреждения** (warnings): не блокируют генерацию, но указывают на потенциальные проблемы:
-  - Отсутствие `operationId` у операций (такие операции будут пропущены)
-  - Неподдерживаемые типы контента в `requestBody` (только `application/json`)
-  - Неподдерживаемые локации параметров (только `path` и `query`)
-
-Предупреждения выводятся при использовании флага `--verbose` или по умолчанию (если не указан `--quiet`).
-
-### Профили окружений
-
-Вы можете определить несколько профилей окружений в конфигурационном файле:
+Configure different environments:
 
 ```yaml
+# dart_swagger_to_api_client.yaml
 client:
   baseUrl: https://api.example.com
-  headers:
-    User-Agent: my-app/1.0.0
 
 environments:
   dev:
     baseUrl: https://dev-api.example.com
-    headers:
-      X-Environment: dev
-  staging:
-    baseUrl: https://staging-api.example.com
-    headers:
-      X-Environment: staging
   prod:
     baseUrl: https://api.example.com
     auth:
       bearerTokenEnv: PROD_BEARER_TOKEN
 ```
-
-Затем используйте флаг `--env` для выбора профиля:
 
 ```bash
 dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
@@ -158,178 +155,90 @@ dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
   --env prod
 ```
 
-### Bearer Token из переменных окружения
+## 📚 Examples
 
-Вы можете указать переменную окружения для bearer token вместо прямого значения:
+See the `example/` directory for complete examples:
 
-```yaml
-client:
-  auth:
-    bearerTokenEnv: API_BEARER_TOKEN  # Читается из переменной окружения
-```
+- `complete_example.dart` — Full end-to-end example
+- `auth_example.dart` — Authentication methods
+- `error_handling_example.dart` — Error handling and retries
+- `middleware_example.dart` — Middleware usage
+- `circuit_breaker_example.dart` — Circuit breaker pattern
+- `transformer_example.dart` — Request/response transformations
+- `riverpod_integration_example.dart` — Riverpod integration
+- `bloc_integration_example.dart` — BLoC integration
 
-Токен будет автоматически читаться из переменной окружения во время выполнения.
-
-После этого в директории `lib/api_client` появится файл `api_client.dart`
-со следующим паттерном:
-
-```dart
-import 'package:dart_swagger_to_api_client/dart_swagger_to_api_client.dart';
-
-// Использование стандартного HTTP адаптера (package:http)
-final config = ApiClientConfig(
-  baseUrl: Uri.parse('https://api.example.com'),
-);
-
-// Или использование Dio адаптера
-import 'package:dio/dio.dart';
-final dio = Dio();
-final adapter = DioHttpClientAdapter(dio: dio);
-final config = ApiClientConfig(
-  baseUrl: Uri.parse('https://api.example.com'),
-  httpClientAdapter: adapter,
-);
-
-// Или использование кастомного адаптера
-// (см. раздел "Using Custom Adapters" ниже)
-
-final client = ApiClient(config);
-
-// Если в спецификации есть GET-эндпоинт с operationId `getUser`,
-// будет сгенерирован метод:
-//
-//   Future<Map<String, dynamic>> getUser()
-//
-// Вызов:
-final userJson = await client.defaultApi.getUser();
-```
-
-> **Примечание**: Если вы используете `dart_swagger_to_models` для генерации моделей,
-> методы будут возвращать типобезопасные модели вместо `Map<String, dynamic>`.
-
-### Управление ресурсами и scoped клиенты
-
-#### Закрытие клиента
-
-Когда клиент больше не нужен, вызовите `close()` для освобождения ресурсов:
-
-```dart
-final client = ApiClient(config);
-try {
-  // Использование клиента
-  await client.defaultApi.getUsers();
-} finally {
-  await client.close(); // Освобождает ресурсы адаптера
-}
-```
-
-#### Scoped клиенты с дополнительными заголовками
-
-Метод `withHeaders()` создаёт новый клиент с объединёнными заголовками:
-
-```dart
-final baseClient = ApiClient(config);
-
-// Создать scoped клиент с дополнительными заголовками
-final scopedClient = baseClient.withHeaders({
-  'X-Request-ID': '123',
-  'X-User-ID': 'user-456',
-});
-
-// Все запросы через scopedClient будут включать эти заголовки
-final users = await scopedClient.defaultApi.getUsers();
-```
-
-Заголовки из `withHeaders()` переопределяют существующие заголовки с тем же ключом.
-
-### Watch-режим
-
-Вы можете автоматически регенерировать клиент при изменении спецификации или конфигурационного файла с помощью флага `--watch`:
+## 🛠️ CLI Options
 
 ```bash
 dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
   --input swagger/api.yaml \
   --output-dir lib/api_client \
   --config dart_swagger_to_api_client.yaml \
+  --env prod \
+  --watch \
+  --verbose
+```
+
+**Options:**
+- `--input` / `-i` — OpenAPI/Swagger spec path (required)
+- `--output-dir` — Output directory (required)
+- `--config` / `-c` — Configuration file path
+- `--env` — Environment profile name
+- `--watch` / `-w` — Watch mode for auto-regeneration
+- `--verbose` / `-v` — Verbose output
+- `--quiet` / `-q` — Quiet mode (errors only)
+- `--help` / `-h` — Show help
+
+## 🔄 Watch Mode
+
+Automatically regenerate on spec changes:
+
+```bash
+dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
+  --input swagger/api.yaml \
+  --output-dir lib/api_client \
   --watch
 ```
 
-**Поведение:**
+## 🤖 CI/CD Integration
 
-- Один запуск генерации на старте
-- Наблюдение за файлом спецификации и автоматическая регенерация клиента при сохранении (с debounce 500ms)
-- Если указан `--config`, также отслеживаются изменения в конфигурационном файле
-- При изменении конфигурационного файла он автоматически перезагружается
-- Учитываются остальные флаги: `--env`, `--verbose`, `--quiet`
+Ready-to-use templates for automatic regeneration:
 
-> **Важно:** Watch-режим поддерживается только для локальных файлов, переданных в `--input`. URL (`http://...` / `https://...`) в watch-режиме использовать нельзя.
+- **GitHub Actions** — `.github/workflows/regenerate-client.yml`
+- **GitLab CI** — `.gitlab-ci.yml`
 
-Для остановки watch-режима нажмите `Ctrl+C`.
+See `ci/README.md` for setup instructions.
 
-### Автоматическая регенерация в CI/CD
+## 🎨 State Management Integration
 
-Пакет включает готовые шаблоны для автоматической регенерации клиента в CI/CD пайплайнах.
+Examples for popular state management solutions:
 
-#### GitHub Actions
+- **Riverpod** — `example/riverpod_integration_example.dart`
+- **BLoC** — `example/bloc_integration_example.dart`
 
-Доступны три workflow шаблона:
+## 📋 Requirements
 
-1. **`regenerate-client.yml`** — регенерация при изменении spec файлов
-2. **`regenerate-client-on-schedule.yml`** — периодическая регенерация (ежедневно)
-3. **`regenerate-client-from-url.yml`** — загрузка spec из удаленного URL
+- Dart SDK: `^3.11.0`
+- `dart_swagger_to_models` (for model generation)
 
-Скопируйте нужные файлы в `.github/workflows/` вашего репозитория и настройте пути.
+## 🤝 Contributing
 
-#### GitLab CI
+Contributions are welcome! Please see [DEVELOPERS.md](doc/en/DEVELOPERS.md) for guidelines.
 
-Конфигурация `.gitlab-ci.yml` автоматически регенерирует клиент при изменении spec файлов.
+## 📄 License
 
-Подробная документация и примеры доступны в `ci/README.md`.
+MIT License — see [LICENSE](LICENSE) file for details.
 
-### Интеграция со state management
+## 🔗 Related Projects
 
-Пакет можно интегрировать с популярными решениями для управления состоянием в Flutter.
+- [`dart_swagger_to_models`](https://github.com/AlexGalitsky/dart_swagger_to_models) — Generate Dart models from OpenAPI specs
 
-#### Riverpod
+## 📞 Support
 
-Примеры интеграции с Riverpod доступны в `example/riverpod_integration_example.dart`:
+- **Issues**: [GitHub Issues](https://github.com/AlexGalitsky/dart_swagger_to_api_client/issues)
+- **Documentation**: See `doc/` directory
 
-- Простые `Provider` и `FutureProvider` для работы с API
-- `StateNotifier` для сложной логики управления состоянием
-- Обработка ошибок и состояний загрузки
-- Автоматическое обновление UI при изменении данных
+---
 
-#### BLoC
-
-Примеры интеграции с BLoC доступны в `example/bloc_integration_example.dart`:
-
-- Создание событий и состояний для API операций
-- Обработка различных типов ошибок (auth, server, timeout)
-- Паттерн Repository для разделения бизнес-логики
-- Использование `BlocBuilder` и `BlocListener` в виджетах
-
-## v0.1 Smoke test (в этом репозитории)
-
-В репозитории есть минимальная OpenAPI‑спека для теста:
-
-- `example/swagger/api.yaml` — определяет эндпоинт `GET /users` с `operationId: getUsers`.
-
-Для ручной проверки генератора можно:
-
-1. Из корня репозитория выполнить:
-
-   ```bash
-   dart run dart_swagger_to_api_client:dart_swagger_to_api_client \
-     --input example/swagger/api.yaml \
-     --output-dir example/generated
-   ```
-
-2. Убедиться, что в `example/generated/api_client.dart` появился код с классами
-   `ApiClient` и `DefaultApi`, а внутри `DefaultApi` есть метод:
-
-   ```dart
-   Future<Map<String, dynamic>> getUsers() async { ... }
-   ```
-
-Дальше этот файл можно скопировать в любой проект и использовать так, как
-показано в секции CLI usage.
+**Made with ❤️ for the Dart/Flutter community**
